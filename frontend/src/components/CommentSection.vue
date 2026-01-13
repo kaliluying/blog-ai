@@ -50,15 +50,19 @@
           <n-button text size="small" @click="showReplyForm(comment.id)">
             回复
           </n-button>
-          <n-button
+          <n-popconfirm
             v-if="canDelete(comment)"
-            text
-            size="small"
-            type="error"
-            @click="handleDelete(comment.id)"
+            positive-text="确认删除"
+            negative-text="取消"
+            @positive-click="handleDelete(comment.id)"
           >
-            删除
-          </n-button>
+            确定要删除这条评论吗？
+            <template #trigger>
+              <n-button text size="small" type="error">
+                删除
+              </n-button>
+            </template>
+          </n-popconfirm>
         </div>
 
         <!-- 回复表单 -->
@@ -92,15 +96,70 @@
             </div>
             <div class="reply-content">{{ reply.content }}</div>
             <div class="reply-actions">
-              <n-button
-                v-if="canDelete(reply)"
-                text
-                size="small"
-                type="error"
-                @click="handleDelete(reply.id)"
-              >
-                删除
+              <n-button text size="small" @click="showReplyForm(reply.id, comment.id)">
+                回复
               </n-button>
+              <n-popconfirm
+                v-if="canDelete(reply)"
+                positive-text="确认删除"
+                negative-text="取消"
+                @positive-click="handleDelete(reply.id)"
+              >
+                确定要删除这条评论吗？
+                <template #trigger>
+                  <n-button text size="small" type="error">
+                    删除
+                  </n-button>
+                </template>
+              </n-popconfirm>
+            </div>
+
+            <!-- 二级回复表单 -->
+            <div v-if="replyingTo === reply.id" class="reply-form">
+              <n-input
+                v-model:value="replyContent"
+                type="textarea"
+                placeholder="写下你的回复..."
+                :rows="2"
+              />
+              <div class="form-actions">
+                <n-button size="small" @click="cancelReply">取消</n-button>
+                <n-button
+                  type="primary"
+                  size="small"
+                  :loading="submitting"
+                  :disabled="!replyContent.trim()"
+                  @click="handleReply(reply.id)"
+                >
+                  回复
+                </n-button>
+              </div>
+            </div>
+
+            <!-- 二级回复列表 -->
+            <div v-if="reply.replies && reply.replies.length > 0" class="sub-replies">
+              <div v-for="subReply in reply.replies" :key="subReply.id" class="sub-reply-item">
+                <div class="sub-reply-header">
+                  <span class="sub-reply-author">{{ subReply.username }}</span>
+                  <span class="sub-reply-date">{{ formatDate(subReply.created_at) }}</span>
+                </div>
+                <div class="sub-reply-content">{{ subReply.content }}</div>
+                <div class="sub-reply-actions">
+                  <n-popconfirm
+                    v-if="canDelete(subReply)"
+                    positive-text="确认删除"
+                    negative-text="取消"
+                    @positive-click="handleDelete(subReply.id)"
+                  >
+                    确定要删除这条评论吗？
+                    <template #trigger>
+                      <n-button text size="small" type="error">
+                        删除
+                      </n-button>
+                    </template>
+                  </n-popconfirm>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -114,7 +173,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useMessage } from 'naive-ui'
+import { useMessage, NPopconfirm } from 'naive-ui'
 import { useAuthStore } from '@/stores/auth'
 import { commentApi, type Comment } from '@/api'
 import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
@@ -135,6 +194,7 @@ const authStore = useAuthStore()
 const newComment = ref('')
 const replyContent = ref('')
 const replyingTo = ref<number | null>(null)
+const replyingToParent = ref<number | null>(null)
 const submitting = ref(false)
 
 // 组件挂载时等待 auth 初始化完成
@@ -156,18 +216,20 @@ const canDelete = (comment: Comment) => {
   return authStore.isAdmin || comment.user_id === authStore.user?.id
 }
 
-const showReplyForm = (commentId: number) => {
+const showReplyForm = (commentId: number, parentId?: number) => {
   if (!authStore.isLoggedIn) {
     message.warning('请先登录后再回复')
     router.push('/login')
     return
   }
   replyingTo.value = commentId
+  replyingToParent.value = parentId || null
   replyContent.value = ''
 }
 
 const cancelReply = () => {
   replyingTo.value = null
+  replyingToParent.value = null
   replyContent.value = ''
 }
 
@@ -210,6 +272,7 @@ const handleReply = async (parentId: number) => {
     await commentApi.createComment(props.postId, replyContent.value, parentId)
     replyContent.value = ''
     replyingTo.value = null
+    replyingToParent.value = null
     message.success('回复发布成功~')
     emit('refresh')
   } catch (e: any) {
@@ -371,5 +434,48 @@ const handleDelete = async (commentId: number) => {
 
 .reply-actions {
   margin-top: 8px;
+  display: flex;
+  gap: 12px;
+}
+
+.sub-replies {
+  margin-top: 12px;
+  padding-left: 16px;
+  border-left: 2px solid #eee;
+}
+
+.sub-reply-item {
+  padding: 8px;
+  background: #f8f8f8;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.sub-reply-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.sub-reply-author {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.sub-reply-date {
+  font-size: 0.75rem;
+  color: #999;
+}
+
+.sub-reply-content {
+  line-height: 1.4;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.sub-reply-actions {
+  margin-top: 6px;
 }
 </style>

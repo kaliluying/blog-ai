@@ -48,6 +48,8 @@ from schemas import (
     CommentResponse,
     CommentWithReplies,
     SearchResult,
+    ArchiveGroup,
+    ArchiveYear,
 )
 from crud import (
     get_posts,
@@ -64,6 +66,9 @@ from crud import (
     get_comment_replies,
     create_comment,
     delete_comment,
+    get_archive_posts_by_year_month,
+    get_archive_years,
+    get_archive_by_year,
 )
 from auth import (
     verify_password,
@@ -180,20 +185,25 @@ app.add_middleware(
 # ========== 工具函数 ==========
 
 
+# 月份名称映射
+MONTH_NAMES = {
+    1: "一月",
+    2: "二月",
+    3: "三月",
+    4: "四月",
+    5: "五月",
+    6: "六月",
+    7: "七月",
+    8: "八月",
+    9: "九月",
+    10: "十月",
+    11: "十一月",
+    12: "十二月",
+}
+
+
 def post_to_dict(post: BlogPost) -> dict:
-    """
-    将 BlogPost ORM 模型转换为字典
-
-    处理说明：
-    - ORM 模型中的 tags 字段是 JSON 字符串存储
-    - 需要转换为 Python 列表返回给前端
-
-    Args:
-        post: BlogPost ORM 模型实例
-
-    Returns:
-        dict: 包含文章数据的字典，tags 为列表类型
-    """
+    """将 BlogPost ORM 模型转换为完整字典"""
     return {
         "id": post.id,
         "title": post.title,
@@ -202,7 +212,17 @@ def post_to_dict(post: BlogPost) -> dict:
         "date": post.date,
         "created_at": post.created_at,
         "updated_at": post.updated_at,
-        # 将 JSON 字符串解析为列表，若为空则返回空列表
+        "tags": json.loads(post.tags) if post.tags else [],
+    }
+
+
+def post_to_list_item(post: BlogPost) -> dict:
+    """将 BlogPost ORM 模型转换为列表项"""
+    return {
+        "id": post.id,
+        "title": post.title,
+        "excerpt": post.excerpt,
+        "date": post.date,
         "tags": json.loads(post.tags) if post.tags else [],
     }
 
@@ -367,7 +387,7 @@ async def search_articles(
 # ========== 评论路由 ==========
 
 
-@app.get("/api/posts/{post_id}/comments", response_model=List[CommentWithReplies])
+@app.get("/api/posts/{post_id}/comments")
 async def get_comments(post_id: int, db: AsyncSession = Depends(get_db)):
     """
     获取文章的评论列表
@@ -376,8 +396,22 @@ async def get_comments(post_id: int, db: AsyncSession = Depends(get_db)):
         post_id: 文章 ID
 
     Returns:
-        List[CommentWithReplies]: 评论列表（包含回复）
+        List[dict]: 评论列表（包含嵌套回复）
     """
+
+    async def get_replies_recursive(parent_id: int) -> list:
+        """递归获取所有层级的回复"""
+        replies = await get_comment_replies(db, parent_id)
+        reply_list = []
+        for reply in replies:
+            reply_user = await get_user_by_id(db, reply.user_id)
+            reply_username = reply_user.username if reply_user else "Unknown"
+            reply_dict = comment_to_dict(reply, reply_username)
+            # 递归获取子回复
+            reply_dict["replies"] = await get_replies_recursive(reply.id)
+            reply_list.append(reply_dict)
+        return reply_list
+
     # 获取顶级评论
     comments = await get_comments_by_post(db, post_id)
 
@@ -387,13 +421,8 @@ async def get_comments(post_id: int, db: AsyncSession = Depends(get_db)):
         user = await get_user_by_id(db, comment.user_id)
         username = user.username if user else "Unknown"
 
-        # 获取回复
-        replies = await get_comment_replies(db, comment.id)
-        reply_list = []
-        for reply in replies:
-            reply_user = await get_user_by_id(db, reply.user_id)
-            reply_username = reply_user.username if reply_user else "Unknown"
-            reply_list.append(comment_to_dict(reply, reply_username))
+        # 获取回复（递归获取所有层级）
+        reply_list = await get_replies_recursive(comment.id)
 
         comment_dict = comment_to_dict(comment, username)
         comment_dict["replies"] = reply_list
@@ -621,6 +650,146 @@ async def delete_existing_post(
     success = await delete_post(db, post_id)
     if not success:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文章不存在")
+
+
+# ========== 归档路由 ==========
+
+
+@app.get("/api/archive", response_model=List[ArchiveYear])
+async def get_archive_list(db: AsyncSession = Depends(get_db)):
+    """
+    获取文章归档列表
+
+    按年份和月份分组返回所有文章
+
+    Returns:
+        List[ArchiveYear]: 年度归档列表
+    """
+    years = await get_archive_years(db)
+    result = []
+
+    for year in years:
+        posts = await get_archive_by_year(db, year)
+        months_data = {}
+
+        for post in posts:
+            post_date = post.date if hasattr(post.date, "month") else post.date.month
+            month = (
+                post_date.month
+                if hasattr(post_date, "month")
+                else int(post_date.split("-")[1])
+            )
+
+            if month not in months_data:
+                months_data[month] = []
+            months_data[month].append(post_to_list_item(post))
+
+        months = []
+        for month, posts_list in months_data.items():
+            months.append(
+                ArchiveGroup(
+                    year=year,
+                    month=month,
+                    month_name=MONTH_NAMES.get(month, str(month)),
+                    post_count=len(posts_list),
+                    posts=posts_list,
+                )
+            )
+
+        # 按月份降序排序
+        months.sort(key=lambda x: x.month, reverse=True)
+        result.append(ArchiveYear(year=year, post_count=len(posts), months=months))
+
+    return result
+
+
+@app.get("/api/archive/{year}", response_model=ArchiveYear)
+async def get_archive_by_year_route(
+    year: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    获取指定年份的文章归档
+
+    Path Parameters:
+        year: 年份
+
+    Returns:
+        ArchiveYear: 年度归档信息
+    """
+    posts = await get_archive_by_year(db, year)
+
+    if not posts:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="该年份没有文章"
+        )
+
+    months_data = {}
+
+    for post in posts:
+        post_date = post.date if hasattr(post.date, "month") else post.date.month
+        month = (
+            post_date.month
+            if hasattr(post_date, "month")
+            else int(post_date.split("-")[1])
+        )
+
+        if month not in months_data:
+            months_data[month] = []
+        months_data[month].append(post_to_list_item(post))
+
+    months = []
+    for month, posts_list in months_data.items():
+        months.append(
+            ArchiveGroup(
+                year=year,
+                month=month,
+                month_name=MONTH_NAMES.get(month, str(month)),
+                post_count=len(posts_list),
+                posts=posts_list,
+            )
+        )
+
+    months.sort(key=lambda x: x.month, reverse=True)
+
+    return ArchiveYear(year=year, post_count=len(posts), months=months)
+
+
+@app.get("/api/archive/{year}/{month}", response_model=ArchiveGroup)
+async def get_archive_by_year_month_route(
+    year: int,
+    month: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    获取指定年月的文章归档
+
+    Path Parameters:
+        year: 年份
+        month: 月份 (1-12)
+
+    Returns:
+        ArchiveGroup: 月度归档信息
+    """
+    if month < 1 or month > 12:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="月份必须在 1-12 之间"
+        )
+
+    posts = await get_archive_posts_by_year_month(db, year, month)
+
+    if not posts:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"{year}年{month}月没有文章"
+        )
+
+    return ArchiveGroup(
+        year=year,
+        month=month,
+        month_name=MONTH_NAMES.get(month, str(month)),
+        post_count=len(posts),
+        posts=[post_to_list_item(p) for p in posts],
+    )
 
 
 # ========== 应用启动入口 ==========

@@ -88,6 +88,27 @@ const router = createRouter({
       path: '/admin/posts/:id',
       name: 'AdminPostEdit',
       component: () => import('@/views/AdminPostNew.vue')
+    },
+
+    // 归档页面：文章归档列表
+    {
+      path: '/archive',
+      name: 'Archive',
+      component: () => import('@/views/Archive.vue')
+    },
+
+    // 归档页面：指定年月的文章
+    {
+      path: '/archive/:year/:month',
+      name: 'ArchiveMonth',
+      component: () => import('@/views/ArchiveMonth.vue')
+    },
+
+    // 标签页面：按标签筛选文章
+    {
+      path: '/tag/:tag',
+      name: 'TagPosts',
+      component: () => import('@/views/TagPosts.vue')
     }
   ]
 })

@@ -28,8 +28,7 @@ load_dotenv()
 # 数据库连接 URL
 # 优先级：环境变量 DATABASE_URL > 默认值
 DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+asyncpg://postgres:postgres@localhost:5432/blog_ai"
+    "DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/blog_ai"
 )
 
 # 创建异步数据库引擎
@@ -38,15 +37,14 @@ engine = create_async_engine(DATABASE_URL, echo=True)
 
 # 创建异步会话工厂
 # expire_on_commit=False: 提交后不立即过期对象，提高性能
-async_session = sessionmaker(
-    engine, class_=AsyncSession, expire_on_commit=False
-)
+async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 # declarative_base: 用于创建 ORM 模型基类
 Base = declarative_base()
 
 
 # ========== 依赖注入 ==========
+
 
 async def get_db():
     """
@@ -77,6 +75,7 @@ async def get_db():
 
 # ========== 数据库初始化 ==========
 
+
 async def init_db():
     """
     初始化数据库表结构
@@ -84,6 +83,9 @@ async def init_db():
     在应用启动时调用，创建所有定义的数据库表。
     使用 SQLAlchemy 的 run_sync 方法同步执行 DDL。
     """
+    # 导入模型，确保 metadata 包含所有表定义
+    from models import BlogPost, User, Comment
+
     async with engine.begin() as conn:
         # 创建所有继承自 Base 的模型对应的表
         await conn.run_sync(Base.metadata.create_all)

@@ -1,9 +1,14 @@
 <template>
   <div class="search-page">
     <div class="container">
-      <h1 class="page-title">
-        搜索结果: "{{ searchQuery }}"
-      </h1>
+      <div class="page-header">
+        <n-button quaternary @click="router.back()">
+          ← 返回
+        </n-button>
+        <h1 class="page-title">
+          搜索结果: "{{ searchQuery }}"
+        </h1>
+      </div>
 
       <n-spin :show="loading">
         <div v-if="results.length > 0" class="results">
@@ -38,10 +43,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { blogApi, type BlogPost } from '@/api'
 
 const route = useRoute()
+const router = useRouter()
 const searchQuery = ref('')
 const results = ref<BlogPost[]>([])
 const loading = ref(false)
@@ -90,12 +96,21 @@ watch(() => route.query.q, () => {
   margin: 0 auto;
 }
 
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
 .page-title {
   font-family: 'Caveat', cursive;
   font-size: 2rem;
   color: #2c3e50;
-  margin-bottom: 32px;
+  margin: 0;
+  flex: 1;
   text-align: center;
+  padding-right: 80px;
 }
 
 .results {

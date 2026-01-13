@@ -123,6 +123,26 @@ export interface Comment {
   replies?: Comment[]
 }
 
+/**
+ * 归档分组接口
+ */
+export interface ArchiveGroup {
+  year: number
+  month: number
+  month_name: string
+  post_count: number
+  posts: BlogPost[]
+}
+
+/**
+ * 年度归档接口
+ */
+export interface ArchiveYear {
+  year: number
+  post_count: number
+  months: ArchiveGroup[]
+}
+
 // ========== 博客 API ==========
 
 export const blogApi = {
@@ -244,14 +264,45 @@ export const commentApi = {
   },
 
   /**
-   * 删除评论
-   * @param commentId 评论 ID
-   * @returns Promise<void>
-   */
-  deleteComment: async (commentId: number): Promise<void> => {
-    return api.delete(`/api/comments/${commentId}`)
-  }
-}
+    * 删除评论
+    * @param commentId 评论 ID
+    * @returns Promise<void>
+    */
+   deleteComment: async (commentId: number): Promise<void> => {
+     return api.delete(`/api/comments/${commentId}`)
+   }
+ }
+
+ // ========== 归档 API ==========
+
+ export const archiveApi = {
+   /**
+    * 获取所有归档
+    * @returns Promise<ArchiveYear[]> 归档列表
+    */
+   getArchive: async (): Promise<ArchiveYear[]> => {
+     return api.get('/api/archive')
+   },
+
+   /**
+    * 获取指定年份的归档
+    * @param year 年份
+    * @returns Promise<ArchiveYear> 年度归档
+    */
+   getArchiveByYear: async (year: number): Promise<ArchiveYear> => {
+     return api.get(`/api/archive/${year}`)
+   },
+
+   /**
+    * 获取指定年月的归档
+    * @param year 年份
+    * @param month 月份
+    * @returns Promise<ArchiveGroup> 月度归档
+    */
+   getArchiveByYearMonth: async (year: number, month: number): Promise<ArchiveGroup> => {
+     return api.get(`/api/archive/${year}/${month}`)
+   }
+ }
 
 // 导出 Axios 实例（可自定义配置时使用）
 export default api

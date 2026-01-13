@@ -35,6 +35,7 @@ from schemas import BlogPostCreate, BlogPostUpdate
 
 # ========== 辅助函数 ==========
 
+
 def utc_now():
     """
     获取当前 UTC 时间
@@ -80,27 +81,22 @@ def tags_from_json(json_str: str) -> List[str]:
 
 # ========== 用户相关 CRUD ==========
 
+
 async def get_user_by_username(db: AsyncSession, username: str) -> Optional[User]:
     """根据用户名获取用户"""
-    result = await db.execute(
-        select(User).where(User.username == username)
-    )
+    result = await db.execute(select(User).where(User.username == username))
     return result.scalar_one_or_none()
 
 
 async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
     """根据邮箱获取用户"""
-    result = await db.execute(
-        select(User).where(User.email == email)
-    )
+    result = await db.execute(select(User).where(User.email == email))
     return result.scalar_one_or_none()
 
 
 async def get_user_by_id(db: AsyncSession, user_id: int) -> Optional[User]:
     """根据 ID 获取用户"""
-    result = await db.execute(
-        select(User).where(User.id == user_id)
-    )
+    result = await db.execute(select(User).where(User.id == user_id))
     return result.scalar_one_or_none()
 
 
@@ -109,14 +105,14 @@ async def create_user(
     username: str,
     email: str,
     hashed_password: str,
-    is_admin: bool = False
+    is_admin: bool = False,
 ) -> User:
     """创建新用户"""
     db_user = User(
         username=username,
         email=email,
         hashed_password=hashed_password,
-        is_admin=is_admin
+        is_admin=is_admin,
     )
     db.add(db_user)
     await db.commit()
@@ -126,10 +122,9 @@ async def create_user(
 
 # ========== 文章相关 CRUD ==========
 
+
 async def get_posts(
-    db: AsyncSession,
-    skip: int = 0,
-    limit: int = 100
+    db: AsyncSession, skip: int = 0, limit: int = 100
 ) -> List[BlogPost]:
     """
     获取文章列表
@@ -148,8 +143,8 @@ async def get_posts(
     result = await db.execute(
         select(BlogPost)
         .order_by(BlogPost.date.desc())  # 降序：最新的在前
-        .offset(skip)                    # 分页偏移
-        .limit(limit)                    # 返回数量限制
+        .offset(skip)  # 分页偏移
+        .limit(limit)  # 返回数量限制
     )
     # 获取所有结果
     return result.scalars().all()
@@ -166,17 +161,13 @@ async def get_post_by_id(db: AsyncSession, post_id: int) -> Optional[BlogPost]:
     Returns:
         Optional[BlogPost]: 找到的文章 ORM 模型，未找到返回 None
     """
-    result = await db.execute(
-        select(BlogPost).where(BlogPost.id == post_id)
-    )
+    result = await db.execute(select(BlogPost).where(BlogPost.id == post_id))
     # scalar_one_or_none: 返回唯一结果或 None
     return result.scalar_one_or_none()
 
 
 async def create_post(
-    db: AsyncSession,
-    post: BlogPostCreate,
-    tags: List[str] = None
+    db: AsyncSession, post: BlogPostCreate, tags: List[str] = None
 ) -> BlogPost:
     """
     创建新文章
@@ -198,7 +189,7 @@ async def create_post(
         excerpt=post.excerpt,
         content=post.content,
         tags=tags_json,
-        date=utc_now()
+        date=utc_now(),
     )
 
     # 添加到会话并提交
@@ -212,10 +203,7 @@ async def create_post(
 
 
 async def update_post(
-    db: AsyncSession,
-    post_id: int,
-    post_update: BlogPostUpdate,
-    tags: List[str] = None
+    db: AsyncSession, post_id: int, post_update: BlogPostUpdate, tags: List[str] = None
 ) -> Optional[BlogPost]:
     """
     更新文章
@@ -281,10 +269,7 @@ async def delete_post(db: AsyncSession, post_id: int) -> bool:
 
 
 async def search_posts(
-    db: AsyncSession,
-    query: str,
-    skip: int = 0,
-    limit: int = 100
+    db: AsyncSession, query: str, skip: int = 0, limit: int = 100
 ) -> List[BlogPost]:
     """
     搜索文章
@@ -308,7 +293,7 @@ async def search_posts(
             or_(
                 BlogPost.title.ilike(search_pattern),
                 BlogPost.content.ilike(search_pattern),
-                BlogPost.excerpt.ilike(search_pattern)
+                BlogPost.excerpt.ilike(search_pattern),
             )
         )
         .order_by(BlogPost.date.desc())
@@ -320,10 +305,8 @@ async def search_posts(
 
 # ========== 评论相关 CRUD ==========
 
-async def get_comments_by_post(
-    db: AsyncSession,
-    post_id: int
-) -> List[Comment]:
+
+async def get_comments_by_post(db: AsyncSession, post_id: int) -> List[Comment]:
     """获取文章的所有顶级评论"""
     result = await db.execute(
         select(Comment)
@@ -333,10 +316,7 @@ async def get_comments_by_post(
     return result.scalars().all()
 
 
-async def get_comment_replies(
-    db: AsyncSession,
-    parent_id: int
-) -> List[Comment]:
+async def get_comment_replies(db: AsyncSession, parent_id: int) -> List[Comment]:
     """获取评论的所有回复"""
     result = await db.execute(
         select(Comment)
@@ -351,14 +331,11 @@ async def create_comment(
     post_id: int,
     user_id: int,
     content: str,
-    parent_id: Optional[int] = None
+    parent_id: Optional[int] = None,
 ) -> Comment:
     """创建评论"""
     db_comment = Comment(
-        post_id=post_id,
-        user_id=user_id,
-        content=content,
-        parent_id=parent_id
+        post_id=post_id, user_id=user_id, content=content, parent_id=parent_id
     )
     db.add(db_comment)
     await db.commit()
@@ -368,9 +345,7 @@ async def create_comment(
 
 async def delete_comment(db: AsyncSession, comment_id: int) -> bool:
     """删除评论"""
-    db_comment = await db.execute(
-        select(Comment).where(Comment.id == comment_id)
-    )
+    db_comment = await db.execute(select(Comment).where(Comment.id == comment_id))
     comment = db_comment.scalar_one_or_none()
     if not comment:
         return False
@@ -378,3 +353,77 @@ async def delete_comment(db: AsyncSession, comment_id: int) -> bool:
     await db.delete(comment)
     await db.commit()
     return True
+
+
+# ========== 归档相关 CRUD ==========
+
+
+async def get_archive_posts_by_year_month(
+    db: AsyncSession, year: int, month: int
+) -> List[BlogPost]:
+    """
+    获取指定年月的文章列表
+
+    Args:
+        db: 数据库会话
+        year: 年份
+        month: 月份 (1-12)
+
+    Returns:
+        List[BlogPost]: 该年月的文章列表
+    """
+    # 计算该月的起始和结束时间
+    start_date = datetime(year, month, 1)
+    if month == 12:
+        end_date = datetime(year + 1, 1, 1)
+    else:
+        end_date = datetime(year, month + 1, 1)
+
+    result = await db.execute(
+        select(BlogPost)
+        .where(BlogPost.date >= start_date, BlogPost.date < end_date)
+        .order_by(BlogPost.date.desc())
+    )
+    return result.scalars().all()
+
+
+async def get_archive_years(db: AsyncSession) -> List[int]:
+    """
+    获取所有有文章的年份列表
+
+    Args:
+        db: 数据库会话
+
+    Returns:
+        List[int]: 有文章的年份列表（降序）
+    """
+    # 使用原生 SQL 提取年份（表名是 blog_posts）
+    result = await db.execute(
+        text(
+            "SELECT DISTINCT EXTRACT(YEAR FROM date)::int as year FROM blog_posts ORDER BY year DESC"
+        )
+    )
+    years = [row[0] for row in result.fetchall() if row[0]]
+    return years
+
+
+async def get_archive_by_year(db: AsyncSession, year: int) -> List[BlogPost]:
+    """
+    获取指定年份的所有文章
+
+    Args:
+        db: 数据库会话
+        year: 年份
+
+    Returns:
+        List[BlogPost]: 该年份的文章列表
+    """
+    start_date = datetime(year, 1, 1)
+    end_date = datetime(year + 1, 1, 1)
+
+    result = await db.execute(
+        select(BlogPost)
+        .where(BlogPost.date >= start_date, BlogPost.date < end_date)
+        .order_by(BlogPost.date.desc())
+    )
+    return result.scalars().all()

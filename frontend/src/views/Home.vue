@@ -90,12 +90,6 @@
                     <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
                   </svg>
                 </a>
-                <a href="https://space.bilibili.com/671157361" target="_blank" class="social-link bilibili" title="B站">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#00A1D6">
-                    <path d="M17.813 4.653h.854c1.51.054 2.769.578 3.773 1.574 1.004.996 1.524 2.249 1.574 3.758v6.844c-.05 1.511-.57 2.771-1.574 3.773-.996 1.004-2.264 1.53-3.773 1.582H5.133c-1.51-.052-2.77-.578-3.773-1.574-1.004-.996-1.524-2.262-1.574-3.773V9.987c.05-1.509.57-2.761 1.574-3.758 1.004-.996 2.264-1.52 3.773-1.574h.903l-.903-2.326h-.427c-.904.052-1.606.356-2.107.914-.5.557-.75 1.317-.75 2.277v7.665c0 .96.25 1.72.75 2.278.5.558 1.203.862 2.107.914h.427l.903-2.327h-.903c-1.51-.052-2.77-.578-3.773-1.574-1.004-.996-1.524-2.262-1.574-3.773V9.987c.05-1.509.57-2.761 1.574-3.758 1.004-.996 2.264-1.52 3.773-1.574h.854v2.326h.427c.904.052 1.606.356 2.107.914.5.557.75 1.317.75 2.277v7.665c0 .96-.25 1.72-.75 2.278-.5.558-1.203.862-2.107.914h-.427v2.326h.903c1.51.054 2.769.578 3.773 1.574 1.004.996 1.524 2.249 1.574 3.758v1.82H2.133v-1.82c-.05-1.511-.57-2.771-1.574-3.773-.996-1.004-2.264-1.53-3.773-1.582H1.787c-.904.052-1.606.356-2.107.914-.5.557-.75 1.317-.75 2.277V19.5c0 .96.25 1.72.75 2.278.5.558 1.203.862 2.107.914h14.712c1.51-.052 2.77-.578 3.773-1.574 1.004-.996 1.524-2.262 1.574-3.773V9.987c-.05-1.509-.57-2.761-1.574-3.758-1.004-.996-2.264-1.52-3.773-1.574z"/>
-                    <path d="M6 8.5h4v7H6v-7zm7.5-1.5h3v1.5h-3V7z" fill="#fff"/>
-                  </svg>
-                </a>
                 <a href="mailto:kaliluying@gmail.com" class="social-link" title="邮箱">
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
@@ -132,6 +126,7 @@
               round
               size="small"
               class="tag-item"
+              @click="goToTag(tag)"
             >
               {{ tag }}
             </n-tag>
@@ -157,7 +152,23 @@
           </ul>
         </HandDrawnCard>
 
-        <!-- 5. 网站统计卡片 -->
+        <!-- 5. 文章归档卡片 -->
+        <HandDrawnCard class="info-card">
+          <h3 class="info-title">
+            <HandDrawnIcon type="star" :size="24" />
+            文章归档
+          </h3>
+          <ul class="archive-list">
+            <li class="archive-item" @click="router.push('/archive')">
+              <span class="archive-link">查看所有归档</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </li>
+          </ul>
+        </HandDrawnCard>
+
+        <!-- 6. 网站统计卡片 -->
         <HandDrawnCard class="info-card">
           <h3 class="info-title">
             <HandDrawnIcon type="star" :size="24" />
@@ -276,6 +287,14 @@ const formatShortDate = (date: string) => {
  */
 const readMore = (id: number) => {
   router.push(`/article/${id}`)
+}
+
+/**
+ * 跳转到标签页面
+ * @param tag 标签名称
+ */
+const goToTag = (tag: string) => {
+  router.push(`/tag/${encodeURIComponent(tag)}`)
 }
 </script>
 
@@ -546,6 +565,34 @@ const readMore = (id: number) => {
   color: #95a5a6;
   margin-left: 12px;
   flex-shrink: 0;
+}
+
+.archive-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.archive-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.archive-item:hover {
+  padding-left: 8px;
+}
+
+.archive-link {
+  font-size: 0.9rem;
+  color: #34495e;
+}
+
+.archive-item:hover .archive-link {
+  color: #3498db;
 }
 
 .about-text {

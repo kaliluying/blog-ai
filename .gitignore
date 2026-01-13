@@ -49,3 +49,11 @@ Thumbs.db
 .cache/
 .temp/
 tmp/
+
+# Documentation (agent-specific)
+AGENTS.md
+CLAUDE.md
+.claude/
+
+# Ruff (Python linter)
+.ruff_cache/
