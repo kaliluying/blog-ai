@@ -9,8 +9,11 @@
 - **代码高亮与复制**: 文章中的代码块支持语法高亮和一键复制
 - **响应式设计**: 适配桌面端和移动端设备
 - **管理后台**: 完整的文章管理功能（新建、编辑、删除、搜索）
-- **标签系统**: 支持文章标签分类和标签云展示
-- **最新文章**: 侧边栏展示最近发布文章
+- **标签系统**: 支持文章标签分类、标签云展示和标签筛选
+- **文章归档**: 按年月组织文章，快速浏览历史内容
+- **评论系统**: 支持嵌套回复、删除确认
+- **搜索功能**: 全文搜索文章标题和内容
+- **用户认证**: JWT Token 认证系统
 
 ## 技术栈
 
@@ -22,12 +25,14 @@
 - **Pinia** - Vue 状态管理
 - **Vue Router** - 路由管理
 - **Axios** - HTTP 客户端
+- **Vitest** - 单元测试框架
 
 ### 后端
 - **FastAPI** - 现代 Python Web 框架
 - **SQLAlchemy** - Python SQL 工具包
 - **PostgreSQL** - 关系型数据库
 - **asyncpg** - PostgreSQL 异步驱动
+- **Pytest** - Python 测试框架
 
 ## 项目结构
 
@@ -42,25 +47,37 @@ blog-ai/
 │   │   │   ├── HandDrawnIcon.vue      # 手绘图标组件
 │   │   │   ├── HandDrawnDivider.vue   # 手绘分割线组件
 │   │   │   ├── HandDrawnConfirm.vue   # 手绘确认对话框
-│   │   │   └── HandDrawnBackground.vue # 手绘背景组件
+│   │   │   ├── HandDrawnBackground.vue# 手绘背景组件
+│   │   │   └── CommentSection.vue     # 评论组件
 │   │   ├── router/           # 路由配置
 │   │   ├── stores/           # Pinia 状态管理
 │   │   ├── views/            # 页面视图
 │   │   │   ├── Home.vue             # 首页
 │   │   │   ├── Article.vue          # 文章详情页
+│   │   │   ├── Archive.vue          # 文章归档页
+│   │   │   ├── ArchiveMonth.vue     # 月度归档页
+│   │   │   ├── TagPosts.vue         # 标签文章页
+│   │   │   ├── Search.vue           # 搜索结果页
 │   │   │   ├── AdminPosts.vue       # 文章管理页
 │   │   │   └── AdminPostNew.vue     # 新建/编辑文章页
 │   │   ├── App.vue            # 根组件
 │   │   └── main.ts            # 入口文件
 │   ├── package.json
-│   └── vite.config.ts
+│   ├── vite.config.ts
+│   └── vitest.config.ts       # Vitest 测试配置
 │
 ├── backend/                  # FastAPI 后端项目
 │   ├── main.py               # FastAPI 应用入口
 │   ├── models.py             # SQLAlchemy 模型
 │   ├── schemas.py            # Pydantic 模式
 │   ├── crud.py               # 数据库操作
-│   └── pyproject.toml        # Python 依赖配置
+│   ├── auth.py               # 认证相关
+│   ├── database.py           # 数据库连接
+│   ├── pyproject.toml        # Python 依赖配置
+│   └── tests/                # 测试文件
+│       ├── conftest.py       # 测试夹具
+│       ├── test_auth.py      # 认证 API 测试
+│       └── test_posts.py     # 文章 API 测试
 │
 └── README.md                 # 项目说明文档
 ```
@@ -89,7 +106,10 @@ cd backend
 uv sync
 
 # 配置数据库连接
-# 编辑 main.py 中的 DATABASE_URL
+# 编辑 .env 文件或使用默认配置
+
+# 初始化数据库表
+uv run python -c "from database import init_db; import asyncio; asyncio.run(init_db())"
 
 # 启动服务
 uv run python main.py
@@ -118,15 +138,54 @@ cd frontend
 npm run build
 ```
 
+### 5. 运行测试
+
+```bash
+# 前端测试
+cd frontend
+npm run test
+
+# 后端测试
+cd backend
+uv run pytest
+```
+
 ## API 接口
+
+### 认证
 
 | 方法 | 端点 | 描述 |
 |------|------|------|
-| GET | `/api/posts` | 获取所有文章列表 |
-| GET | `/api/posts/{id}` | 获取单篇文章详情 |
-| POST | `/api/posts` | 创建新文章 |
-| PUT | `/api/posts/{id}` | 更新文章 |
-| DELETE | `/api/posts/{id}` | 删除文章 |
+| POST | `/api/auth/register` | 用户注册 |
+| POST | `/api/auth/login` | 用户登录 |
+| GET | `/api/auth/me` | 获取当前用户信息 |
+
+### 文章
+
+| 方法 | 端点 | 描述 | 认证 |
+|------|------|------|------|
+| GET | `/api/posts` | 获取所有文章列表 | 否 |
+| GET | `/api/posts/{id}` | 获取单篇文章详情 | 否 |
+| POST | `/api/posts` | 创建新文章 | 管理员 |
+| PUT | `/api/posts/{id}` | 更新文章 | 管理员 |
+| DELETE | `/api/posts/{id}` | 删除文章 | 管理员 |
+| GET | `/api/search?q=` | 搜索文章 | 否 |
+
+### 归档
+
+| 方法 | 端点 | 描述 |
+|------|------|------|
+| GET | `/api/archive` | 获取所有归档（按年月分组） |
+| GET | `/api/archive/{year}` | 获取指定年份归档 |
+| GET | `/api/archive/{year}/{month}` | 获取指定年月归档 |
+
+### 评论
+
+| 方法 | 端点 | 描述 | 认证 |
+|------|------|------|------|
+| GET | `/api/posts/{id}/comments` | 获取文章评论 | 否 |
+| POST | `/api/comments` | 创建评论/回复 | 是 |
+| DELETE | `/api/comments/{id}` | 删除评论 | 是 |
 
 ### 请求示例
 
@@ -134,6 +193,7 @@ npm run build
 ```bash
 curl -X POST http://localhost:8000/api/posts \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
   -d '{
     "title": "我的第一篇文章",
     "excerpt": "这是文章摘要",
@@ -148,6 +208,12 @@ curl -X POST http://localhost:8000/api/posts \
 |------|------|------|
 | `/` | Home | 首页，展示文章列表和侧边栏 |
 | `/article/:id` | Article | 文章详情页 |
+| `/archive` | Archive | 文章归档页（按年月分组） |
+| `/archive/:year/:month` | ArchiveMonth | 月度归档页 |
+| `/tag/:tag` | TagPosts | 标签筛选页 |
+| `/search?q=` | Search | 搜索结果页 |
+| `/login` | Login | 登录页 |
+| `/register` | Register | 注册页 |
 | `/admin/posts` | AdminPosts | 文章管理页面 |
 | `/admin/posts/new` | AdminPostNew | 新建文章页面 |
 | `/admin/posts/:id` | AdminPostNew | 编辑文章页面 |
@@ -180,6 +246,17 @@ curl -X POST http://localhost:8000/api/posts \
 ```
 
 可用图标类型：`star`、`heart`、`bookmark`、`comment`
+
+### CommentSection
+评论组件，支持嵌套回复。
+
+```vue
+<CommentSection
+  :post-id="postId"
+  :comments="comments"
+  @refresh="fetchComments"
+/>
+```
 
 ## 自定义配置
 
