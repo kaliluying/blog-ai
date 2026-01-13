@@ -1,19 +1,44 @@
+<!--
+  AdminPostNew.vue - 新建/编辑文章页面组件
+
+  本组件提供后台新建和编辑文章功能，包括：
+  1. 文章标题、摘要、标签编辑
+  2. Markdown 内容编辑（支持实时预览）
+  3. 表单验证和提交
+  4. 支持编辑模式加载已有文章数据
+-->
+
 <template>
+  <!-- 页面容器 -->
   <div class="admin-new-page">
+    <!-- 手绘风格背景 -->
     <HandDrawnBackground />
 
+    <!-- 管理页面容器 -->
     <div class="admin-container">
       <HandDrawnCard class="admin-card">
+
+        <!-- 页面头部 -->
         <div class="page-header">
+          <!-- 返回按钮 -->
           <n-button quaternary @click="router.back()">
             ← 返回
           </n-button>
-          <h1 class="page-title">新建文章</h1>
+          <h1 class="page-title">{{ isEditMode ? '编辑文章' : '新建文章' }}</h1>
         </div>
 
+        <!-- 加载状态 -->
+        <div v-if="loading" class="loading-state">
+          <n-spin size="large" />
+          <p>加载中...</p>
+        </div>
+
+        <!-- 分隔线 -->
         <HandDrawnDivider />
 
-        <div class="form-container">
+        <!-- 表单区域 -->
+        <div v-if="!loading" class="form-container">
+          <!-- 标题输入 -->
           <div class="form-row">
             <span class="form-label">标题</span>
             <n-input
@@ -23,6 +48,7 @@
             />
           </div>
 
+          <!-- 摘要输入 -->
           <div class="form-row">
             <span class="form-label">摘要</span>
             <n-input
@@ -33,14 +59,17 @@
             />
           </div>
 
+          <!-- 标签输入 -->
           <div class="form-row">
             <span class="form-label">标签</span>
             <n-dynamic-tags v-model:value="formData.tags" />
           </div>
 
+          <!-- 内容编辑/预览 -->
           <div class="form-row">
             <span class="form-label">内容</span>
             <div class="editor-container">
+              <!-- 编辑器标签页 -->
               <div class="editor-tabs">
                 <n-button
                   :type="editorMode === 'edit' ? 'primary' : 'default'"
@@ -58,6 +87,7 @@
                 </n-button>
               </div>
 
+              <!-- 编辑模式：Markdown 输入框 -->
               <n-input
                 v-if="editorMode === 'edit'"
                 v-model:value="formData.content"
@@ -67,99 +97,167 @@
                 class="markdown-editor"
               />
 
+              <!-- 预览模式：渲染后的 HTML -->
               <div v-else class="markdown-preview" v-html="renderedContent"></div>
             </div>
           </div>
 
+          <!-- 表单操作按钮 -->
           <div class="form-actions">
             <n-button @click="router.back()">取消</n-button>
             <n-button type="primary" :loading="submitting" @click="handleSubmit">
-              发布文章
+              {{ isEditMode ? '保存修改' : '发布文章' }}
             </n-button>
           </div>
         </div>
+
       </HandDrawnCard>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
+// 从 vue 导入 Composition API 工具
+import { ref, computed, onMounted } from 'vue'
+
+// 从 vue-router 导入路由功能
+import { useRouter, useRoute } from 'vue-router'
+
+// 从 naive-ui 导入消息提示
 import { useMessage } from 'naive-ui'
+
+// 导入自定义手绘风格组件
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
 import HandDrawnDivider from '@/components/HandDrawnDivider.vue'
 import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
-import { blogApi } from '@/api'
 
+// 导入 API 和工具函数
+import { blogApi } from '@/api'
+import { renderMarkdownSafe } from '@/utils/markdown'
+
+// ========== 组合式函数 ==========
+
+// 路由实例
 const router = useRouter()
+
+// 路由参数（用于判断是否为编辑模式）
+const route = useRoute()
+
+// 消息提示实例
 const message = useMessage()
 
-const submitting = ref(false)
-const editorMode = ref<'edit' | 'preview'>('edit')
+// ========== 响应式状态 ==========
 
-const formData = ref({
-  title: '',
-  excerpt: '',
-  content: '',
-  tags: [] as string[]
+// 是否为编辑模式
+const isEditMode = computed(() => !!route.params.id)
+
+// 文章 ID（编辑模式时使用）
+const postId = computed(() => {
+  const id = Number(route.params.id)
+  return isNaN(id) ? null : id
 })
 
-// 简单的 Markdown 渲染函数
-const renderMarkdown = (text: string): string => {
-  if (!text) return '<p class="empty-hint">预览区域</p>'
+// 加载状态
+const loading = ref(false)
 
-  let html = text
-    // 代码块
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-    // 行内代码
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    // 粗体
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    // 斜体
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-    // 删除线
-    .replace(/~~([^~]+)~~/g, '<del>$1</del>')
-    // 链接
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
-    // 引用
-    .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
-    // 标题
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    // 无序列表
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    // 有序列表
-    .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
-    // 段落
-    .replace(/\n\n/g, '</p><p>')
-    // 换行
-    .replace(/\n/g, '<br>')
+// 提交状态（控制按钮 loading）
+const submitting = ref(false)
 
-  return `<p>${html}</p>`
+// 编辑器模式：'edit' 编辑模式 | 'preview' 预览模式
+const editorMode = ref<'edit' | 'preview'>('edit')
+
+// 表单数据
+const formData = ref({
+  title: '',       // 文章标题
+  excerpt: '',     // 文章摘要
+  content: '',     // 文章内容（Markdown）
+  tags: [] as string[]  // 文章标签
+})
+
+// ========== 计算属性 ==========
+
+/**
+ * 渲染后的内容（计算属性）
+ * 使用共享的 Markdown 渲染函数并消毒 HTML
+ * 当 formData.content 变化时自动重新渲染
+ */
+const renderedContent = computed(() => {
+  if (!formData.value.content) return '<p class="empty-hint">预览区域</p>'
+  return renderMarkdownSafe(formData.value.content)
+})
+
+/**
+ * 获取文章数据（编辑模式使用）
+ * 从后端 API 获取单篇文章的数据并填充表单
+ */
+const fetchPost = async () => {
+  // 验证是否为有效的编辑模式
+  if (!isEditMode.value || postId.value === null) return
+
+  loading.value = true
+  try {
+    const post = await blogApi.getPost(postId.value)
+    formData.value = {
+      title: post.title,
+      excerpt: post.excerpt,
+      content: post.content,
+      tags: post.tags || []
+    }
+  } catch (e) {
+    message.error('获取文章失败')
+    console.error(e)
+    router.push('/admin/posts')
+  } finally {
+    loading.value = false
+  }
 }
 
-const renderedContent = computed(() => renderMarkdown(formData.value.content))
-
+/**
+ * 处理表单提交
+ * 验证表单数据并调用 API 创建或更新文章
+ */
 const handleSubmit = async () => {
+  // 表单验证
   if (!formData.value.title || !formData.value.excerpt || !formData.value.content) {
     message.warning('请填写完整信息')
     return
   }
 
+  // 编辑模式下的 ID 验证
+  if (isEditMode.value && postId.value === null) {
+    message.error('无效的文章 ID')
+    return
+  }
+
+  // 开始提交
   submitting.value = true
+
   try {
-    await blogApi.createPost(formData.value)
-    message.success('文章发布成功')
+    if (isEditMode.value) {
+      // 更新文章
+      await blogApi.updatePost(postId.value!, formData.value)
+      message.success('文章更新成功')
+    } else {
+      // 创建文章
+      await blogApi.createPost(formData.value)
+      message.success('文章发布成功')
+    }
+    // 跳转到文章列表页
     router.push('/admin/posts')
   } catch (e) {
-    message.error('发布失败')
+    message.error(isEditMode.value ? '更新失败' : '发布失败')
     console.error(e)
   } finally {
     submitting.value = false
   }
 }
+
+// ========== 生命周期 ==========
+
+// 组件挂载时获取文章数据（编辑模式）
+onMounted(() => {
+  fetchPost()
+})
 </script>
 
 <style scoped>
@@ -178,6 +276,16 @@ const handleSubmit = async () => {
 
 .admin-card {
   width: 100%;
+}
+
+.loading-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #7f8c8d;
+}
+
+.loading-state p {
+  margin-top: 16px;
 }
 
 .page-header {

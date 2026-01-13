@@ -1,10 +1,25 @@
+<!--
+  Home.vue - 首页组件
+
+  本组件是博客的首页，包含：
+  1. 手绘风格背景
+  2. 左侧文章列表区域
+  3. 右侧侧边栏（作者信息、公告、标签云、最新文章、网站统计）
+-->
+
 <template>
+  <!-- 页面容器 -->
   <div class="blog-home">
+    <!-- 手绘风格背景组件 -->
     <HandDrawnBackground />
 
+    <!-- 主内容容器：左右两栏布局 -->
     <div class="main-container">
-      <!-- 左侧：文章列表 -->
+
+      <!-- ========== 左侧区域：文章列表 ========== -->
       <section class="left-section">
+
+        <!-- Hero 区域：欢迎语 -->
         <section class="hero-section">
           <HandDrawnCard class="hero-card">
             <h1 class="hero-title">欢迎来到我的手绘博客</h1>
@@ -12,17 +27,20 @@
           </HandDrawnCard>
         </section>
 
+        <!-- 文章列表区域 -->
         <section class="posts-section">
           <h2 class="section-title">
             <HandDrawnIcon type="star" :size="32" />
             最新文章
           </h2>
 
+          <!-- 加载状态 -->
           <div v-if="loading" class="loading-state">
             <n-spin size="large" />
             <p>加载中...</p>
           </div>
 
+          <!-- 文章列表 -->
           <div v-else class="posts-grid">
             <HandDrawnCard
               v-for="post in posts"
@@ -30,28 +48,33 @@
               :title="post.title"
               class="post-card"
             >
+              <!-- 文章元信息：标签和日期 -->
               <div class="post-meta">
                 <n-tag v-for="tag in post.tags" :key="tag" size="small" round>
                   {{ tag }}
                 </n-tag>
                 <span class="post-date">{{ formatDate(post.date) }}</span>
               </div>
+              <!-- 文章摘要 -->
               <p class="post-excerpt">{{ post.excerpt }}</p>
+              <!-- 阅读更多按钮 -->
               <n-button quaternary @click="readMore(post.id)">
                 阅读更多 →
               </n-button>
             </HandDrawnCard>
           </div>
 
+          <!-- 空状态：无文章时显示 -->
           <div v-if="!loading && posts.length === 0" class="empty-state">
             <p>暂无文章</p>
           </div>
         </section>
       </section>
 
-      <!-- 右侧：信息栏 -->
+      <!-- ========== 右侧区域：侧边栏 ========== -->
       <aside class="right-section">
-        <!-- 作者信息 -->
+
+        <!-- 1. 作者信息卡片 -->
         <HandDrawnCard class="info-card">
           <div class="author-info">
             <div class="author-avatar">
@@ -60,6 +83,7 @@
             <div class="author-detail">
               <h3 class="author-name">博主大大</h3>
               <p class="author-bio">热爱编程与绘画，专注于全栈开发</p>
+              <!-- 社交链接 -->
               <div class="social-links">
                 <a href="https://github.com/kaliluying" target="_blank" class="social-link" title="GitHub">
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -83,7 +107,7 @@
           </div>
         </HandDrawnCard>
 
-        <!-- 公告 -->
+        <!-- 2. 公告卡片 -->
         <HandDrawnCard class="info-card">
           <h3 class="info-title">
             <HandDrawnIcon type="heart" :size="24" />
@@ -95,7 +119,7 @@
           </p>
         </HandDrawnCard>
 
-        <!-- 标签云 -->
+        <!-- 3. 标签云卡片 -->
         <HandDrawnCard class="info-card">
           <h3 class="info-title">
             <HandDrawnIcon type="star" :size="24" />
@@ -114,7 +138,7 @@
           </div>
         </HandDrawnCard>
 
-        <!-- 最新文章 -->
+        <!-- 4. 最新文章卡片 -->
         <HandDrawnCard class="info-card">
           <h3 class="info-title">
             <HandDrawnIcon type="star" :size="24" />
@@ -133,7 +157,7 @@
           </ul>
         </HandDrawnCard>
 
-        <!-- 网站统计 -->
+        <!-- 5. 网站统计卡片 -->
         <HandDrawnCard class="info-card">
           <h3 class="info-title">
             <HandDrawnIcon type="star" :size="24" />
@@ -150,41 +174,82 @@
             </div>
           </div>
         </HandDrawnCard>
+
       </aside>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+// 从 vue 导入 Composition API 工具
 import { computed, onMounted } from 'vue'
+
+// 从 vue-router 导入路由功能
 import { useRouter } from 'vue-router'
+
+// 从 stores 导入博客状态管理
 import { useBlogStore } from '@/stores/blog'
+
+// 导入自定义手绘风格组件
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
 import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
 import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
 
+// ========== 组合式函数 ==========
+
+// 路由实例，用于页面跳转
 const router = useRouter()
+
+// 博客 Store 实例，用于获取文章数据
 const blogStore = useBlogStore()
 
+// ========== 生命周期 ==========
+
+/**
+ * 组件挂载时获取文章列表
+ * onMounted 是 Vue 的生命周期钩子，在 DOM 渲染完成后执行
+ */
 onMounted(() => {
   blogStore.fetchPosts()
 })
 
+// ========== 计算属性 ==========
+
+// 从 Store 获取文章列表（响应式）
 const posts = computed(() => blogStore.posts)
+
+// 从 Store 获取加载状态（响应式）
 const loading = computed(() => blogStore.loading)
 
+/**
+ * 获取所有标签（去重）
+ * 使用 Set 数据结构自动去重，然后转为数组
+ */
 const allTags = computed(() => {
   const tags = new Set<string>()
   posts.value.forEach(post => post.tags.forEach(tag => tags.add(tag)))
   return Array.from(tags)
 })
 
+/**
+ * 获取最新文章（前 5 篇）
+ * 按日期降序排序后取前 5 条
+ */
 const recentPosts = computed(() => {
   return [...posts.value]
+    // 按日期降序排序（最新的在前）
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    // 取前 5 篇
     .slice(0, 5)
 })
 
+// ========== 方法 ==========
+
+/**
+ * 格式化日期（完整格式）
+ * @param date ISO 日期字符串
+ * @returns 格式化的中文日期字符串
+ */
 const formatDate = (date: string) => {
   return new Date(date).toLocaleDateString('zh-CN', {
     year: 'numeric',
@@ -193,6 +258,11 @@ const formatDate = (date: string) => {
   })
 }
 
+/**
+ * 格式化日期（简短格式）
+ * @param date ISO 日期字符串
+ * @returns 简短的中文日期字符串
+ */
 const formatShortDate = (date: string) => {
   return new Date(date).toLocaleDateString('zh-CN', {
     month: 'short',
@@ -200,6 +270,10 @@ const formatShortDate = (date: string) => {
   })
 }
 
+/**
+ * 阅读更多：跳转到文章详情页
+ * @param id 文章 ID
+ */
 const readMore = (id: number) => {
   router.push(`/article/${id}`)
 }

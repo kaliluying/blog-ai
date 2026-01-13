@@ -1,12 +1,28 @@
+<!--
+  AdminPosts.vue - 文章管理页面组件
+
+  本组件提供后台文章管理功能，包括：
+  1. 文章列表展示
+  2. 搜索筛选功能
+  3. 删除文章操作
+  4. 新建文章入口
+-->
+
 <template>
+  <!-- 页面容器 -->
   <div class="admin-posts-page">
+    <!-- 手绘风格背景 -->
     <HandDrawnBackground />
 
+    <!-- 管理页面容器 -->
     <div class="admin-container">
       <HandDrawnCard class="admin-card">
+
+        <!-- 头部：标题和操作按钮 -->
         <div class="admin-header">
           <h1 class="admin-title">文章管理</h1>
           <div class="header-actions">
+            <!-- 搜索框 -->
             <n-input
               v-model:value="searchKeyword"
               placeholder="搜索文章..."
@@ -17,6 +33,7 @@
                 <HandDrawnIcon type="star" :size="16" />
               </template>
             </n-input>
+            <!-- 新建文章按钮 -->
             <n-button type="primary" @click="router.push('/admin/posts/new')">
               <HandDrawnIcon type="star" :size="18" />
               新建文章
@@ -24,16 +41,19 @@
           </div>
         </div>
 
+        <!-- 加载状态 -->
         <div v-if="loading" class="loading-state">
           <n-spin size="large" />
           <p>加载中...</p>
         </div>
 
+        <!-- 空状态：无文章时显示 -->
         <div v-else-if="posts.length === 0" class="empty-state">
           <HandDrawnIcon type="star" :size="48" />
           <p>暂无文章，点击新建文章开始创作</p>
         </div>
 
+        <!-- 文章表格 -->
         <n-data-table
           v-else
           :columns="columns"
@@ -42,58 +62,109 @@
           :row-key="(row: BlogPost) => row.id"
         />
 
+        <!-- 搜索无结果状态 -->
         <div v-if="filteredPosts.length === 0 && posts.length > 0" class="empty-state">
           <HandDrawnIcon type="star" :size="32" />
           <p>没有找到匹配的文章</p>
         </div>
+
       </HandDrawnCard>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+// 从 vue 导入 Composition API 工具
 import { ref, computed, onMounted, h } from 'vue'
+
+// 从 vue-router 导入路由功能
 import { useRouter } from 'vue-router'
+
+// 从 naive-ui 导入组件和类型
 import { useMessage, NButton, NTag, NSpace, NInput } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
+
+// 导入自定义手绘风格组件
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
 import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
 import HandDrawnConfirm from '@/components/HandDrawnConfirm.vue'
 import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
-import { useBlogStore, type BlogPost } from '@/stores/blog'
-import { blogApi } from '@/api'
 
+// 导入 Store 和 API
+import { useBlogStore } from '@/stores/blog'
+import { blogApi, type BlogPost } from '@/api'
+
+// ========== 组合式函数 ==========
+
+// 博客 Store 实例
 const blogStore = useBlogStore()
+
+// 路由实例
 const router = useRouter()
+
+// 消息提示实例
 const message = useMessage()
 
+// ========== 响应式状态 ==========
+
+// 搜索关键词
 const searchKeyword = ref('')
 
+// 从 Store 获取加载状态
 const loading = computed(() => blogStore.loading)
+
+// 从 Store 获取文章列表
 const posts = computed(() => blogStore.posts)
 
+// ========== 计算属性 ==========
+
+/**
+ * 过滤后的文章列表
+ * 根据搜索关键词在标题、摘要和标签中进行匹配
+ */
 const filteredPosts = computed(() => {
+  // 如果没有搜索词，返回全部文章
   if (!searchKeyword.value.trim()) {
     return posts.value
   }
+
+  // 将搜索词转为小写（不区分大小写搜索）
   const keyword = searchKeyword.value.toLowerCase()
+
+  // 过滤文章
   return posts.value.filter(post =>
+    // 匹配标题
     post.title.toLowerCase().includes(keyword) ||
+    // 匹配摘要
     post.excerpt.toLowerCase().includes(keyword) ||
+    // 匹配标签
     post.tags.some(tag => tag.toLowerCase().includes(keyword))
   )
 })
 
+// ========== 方法 ==========
+
+/**
+ * 处理删除文章
+ * @param id 要删除的文章 ID
+ */
 const handleDelete = async (id: number) => {
   try {
+    // 调用 API 删除文章
     await blogApi.deletePost(id)
     message.success('删除成功')
+    // 重新获取文章列表
     blogStore.fetchPosts()
   } catch (e) {
     message.error('删除失败')
   }
 }
 
+/**
+ * 格式化日期
+ * @param date ISO 日期字符串
+ * @returns 格式化的中文日期
+ */
 const formatDate = (date: string) => {
   return new Date(date).toLocaleDateString('zh-CN', {
     year: 'numeric',
@@ -102,33 +173,52 @@ const formatDate = (date: string) => {
   })
 }
 
+/**
+ * 创建表格列配置
+ * 使用 h 函数手动创建 JSX 风格的列渲染
+ *
+ * @returns 表格列配置数组
+ */
 const createColumns = (): DataTableColumns<BlogPost> => [
+  // ID 列
   {
     title: 'ID',
     key: 'id',
     width: 60
   },
+  // 标题列（支持省略显示）
   {
     title: '标题',
     key: 'title',
     ellipsis: true
   },
+  // 标签列（渲染为标签数组）
   {
     title: '标签',
     key: 'tags',
-    render: (row) => h(NSpace, () => row.tags.map(tag => h(NTag, { size: 'small', round: true }, () => tag)))
+    render: (row) => h(NSpace, () => row.tags.map((tag: string) => h(NTag, { size: 'small', round: true }, () => tag)))
   },
+  // 日期列（格式化显示）
   {
     title: '日期',
     key: 'date',
     width: 120,
     render: (row) => formatDate(row.date)
   },
+  // 操作列（编辑和删除按钮）
   {
     title: '操作',
     key: 'actions',
-    width: 150,
+    width: 200,
     render: (row) => h(NSpace, () => [
+      // 编辑按钮
+      h(NButton, {
+        size: 'small',
+        quaternary: true,
+        type: 'primary',
+        onClick: () => router.push(`/admin/posts/${row.id}`)
+      }, () => '编辑'),
+      // 确认删除对话框
       h(HandDrawnConfirm, {
         message: '确定要删除这篇文章吗？',
         onConfirm: () => handleDelete(row.id)
@@ -139,8 +229,12 @@ const createColumns = (): DataTableColumns<BlogPost> => [
   }
 ]
 
+// 创建列配置实例
 const columns = createColumns()
 
+// ========== 生命周期 ==========
+
+// 组件挂载时获取文章列表
 onMounted(() => {
   blogStore.fetchPosts()
 })

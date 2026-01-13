@@ -16,8 +16,10 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
+    "@types/dompurify": "^3.0.5",
     "@vueuse/core": "^14.1.0",
     "axios": "^1.13.2",
+    "dompurify": "^3.3.1",
     "naive-ui": "^2.43.2",
     "pinia": "^3.0.4",
     "roughjs": "^4.6.6",

@@ -1,0 +1,20 @@
+# 确保所有用户使用一致的换行符
+# Windows: CRLF -> LF on commit, LF -> CRLF on checkout
+# macOS/Linux: LF only
+
+# 强制文本文件使用 LF
+*.py text eol=lf
+*.ts text eol=lf
+*.vue text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# 二进制文件不转换
+*.png binary
+*.jpg binary
+*.svg binary
+*.ttf binary
+*.woff binary

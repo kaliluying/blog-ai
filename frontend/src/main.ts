@@ -1,13 +1,38 @@
+/**
+ * Vue 3 应用入口文件
+ *
+ * 本文件负责初始化 Vue 应用实例，配置并注册核心依赖：
+ * - Pinia: 状态管理
+ * - Naive UI: UI 组件库
+ * - Vue Router: 路由管理
+ */
+
+// 从 vue 包中导入 createApp 函数，用于创建 Vue 应用实例
 import { createApp } from 'vue'
+
+// 从 pinia 包中导入 createPinia 函数，用于创建状态管理实例
 import { createPinia } from 'pinia'
+
+// 从 naive-ui 包中导入 Naive UI 组件库
 import NaiveUI from 'naive-ui'
+
+// 导入根组件 App.vue
 import App from './App.vue'
+
+// 导入路由配置
 import router from './router'
 
+// 创建 Vue 应用实例，传入根组件
 const app = createApp(App)
 
+// 注册 Pinia 状态管理
 app.use(createPinia())
+
+// 注册 Naive UI 组件库
 app.use(NaiveUI)
+
+// 注册路由
 app.use(router)
 
+// 将应用挂载到 DOM 中的 #app 元素
 app.mount('#app')
