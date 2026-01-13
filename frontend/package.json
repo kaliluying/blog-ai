@@ -17,9 +17,11 @@
   },
   "dependencies": {
     "@types/dompurify": "^3.0.5",
+    "@vicons/utils": "^0.1.4",
     "@vueuse/core": "^14.1.0",
     "axios": "^1.13.2",
     "dompurify": "^3.3.1",
+    "ionicons": "^8.0.13",
     "naive-ui": "^2.43.2",
     "pinia": "^3.0.4",
     "roughjs": "^4.6.6",

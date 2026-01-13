@@ -3,7 +3,7 @@
 
   本组件是整个 Vue 应用的顶层容器，包含：
   1. Naive UI 组件Provider（配置全局主题和弹窗服务）
-  2. 顶部导航栏（Logo 和导航链接）
+  2. 顶部导航栏（Logo 和导航链接、用户菜单）
   3. 主内容区（路由视图容器）
   4. 底部版权信息
 -->
@@ -36,10 +36,33 @@
                     <span>手绘博客</span>
                   </router-link>
 
+                  <!-- 搜索框 -->
+                  <div class="search-box">
+                    <n-input
+                      v-model:value="searchQuery"
+                      placeholder="搜索文章..."
+                      @keyup.enter="handleSearch"
+                      clearable
+                    >
+                      <template #prefix>
+                        <n-icon :component="SearchIcon" />
+                      </template>
+                    </n-input>
+                  </div>
+
                   <!-- 导航菜单 -->
                   <nav class="nav">
                     <router-link to="/" class="nav-link">首页</router-link>
-                    <router-link to="/admin/posts" class="nav-link">管理</router-link>
+                    <template v-if="authStore.isLoggedIn">
+                      <router-link v-if="authStore.isAdmin" to="/admin/posts" class="nav-link">管理</router-link>
+                      <n-dropdown :options="userMenuOptions" @select="handleUserMenuSelect">
+                        <span class="nav-link user-name">{{ authStore.user?.username }}</span>
+                      </n-dropdown>
+                    </template>
+                    <template v-else>
+                      <router-link to="/login" class="nav-link">登录</router-link>
+                      <router-link to="/register" class="nav-link">注册</router-link>
+                    </template>
                     <router-link to="/about" class="nav-link">关于</router-link>
                   </nav>
                 </div>
@@ -69,11 +92,131 @@
 </template>
 
 <script setup lang="ts">
-// 导入 Naive UI 的全局主题类型
-import { type GlobalThemeOverrides } from 'naive-ui'
+import { ref, h } from 'vue'
+import { useRouter } from 'vue-router'
+import { NIcon, type GlobalThemeOverrides } from 'naive-ui'
 
-// 导入自定义的手绘风格图标组件
 import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
+import { useAuthStore } from '@/stores/auth'
+
+// SVG 图标组件
+const SearchIcon = {
+  render() {
+    return h('svg', {
+      xmlns: 'http://www.w3.org/2000/svg',
+      viewBox: '0 0 512 512',
+      width: 16,
+      height: 16,
+      fill: 'currentColor'
+    }, [
+      h('path', {
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+        'stroke-width': '32',
+        d: 'M221.09 64a157.09 157.09 0 1 0 157.09 157.09A157.1 157.1 0 0 0 221.09 64z'
+      }),
+      h('path', {
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+        'stroke-width': '32',
+        d: 'M338.29 338.29L448 448'
+      })
+    ])
+  }
+}
+
+const UserIcon = {
+  render() {
+    return h('svg', {
+      xmlns: 'http://www.w3.org/2000/svg',
+      viewBox: '0 0 24 24',
+      width: 16,
+      height: 16,
+      fill: 'currentColor'
+    }, [
+      h('path', { d: 'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z' })
+    ])
+  }
+}
+
+const WriteIcon = {
+  render() {
+    return h('svg', {
+      xmlns: 'http://www.w3.org/2000/svg',
+      viewBox: '0 0 24 24',
+      width: 16,
+      height: 16,
+      fill: 'currentColor'
+    }, [
+      h('path', { d: 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z' })
+    ])
+  }
+}
+
+const LogoutIcon = {
+  render() {
+    return h('svg', {
+      xmlns: 'http://www.w3.org/2000/svg',
+      viewBox: '0 0 24 24',
+      width: 16,
+      height: 16,
+      fill: 'currentColor'
+    }, [
+      h('path', { d: 'M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z' })
+    ])
+  }
+}
+
+const router = useRouter()
+const authStore = useAuthStore()
+
+const searchQuery = ref('')
+
+// 用户菜单选项
+const userMenuOptions = [
+  {
+    label: '个人中心',
+    key: 'profile',
+    icon: () => h(NIcon, null, { default: () => h(UserIcon) })
+  },
+  {
+    label: '写文章',
+    key: 'write',
+    icon: () => h(NIcon, null, { default: () => h(WriteIcon) })
+  },
+  { type: 'divider', key: 'd1' },
+  {
+    label: '退出登录',
+    key: 'logout',
+    icon: () => h(NIcon, null, { default: () => h(LogoutIcon) })
+  }
+]
+
+// 处理用户菜单选择
+const handleUserMenuSelect = (key: string) => {
+  switch (key) {
+    case 'profile':
+      router.push('/profile')
+      break
+    case 'write':
+      router.push('/admin/posts/new')
+      break
+    case 'logout':
+      authStore.logout()
+      break
+  }
+}
+
+// 搜索处理
+const handleSearch = () => {
+  if (searchQuery.value.trim()) {
+    router.push({ path: '/search', query: { q: searchQuery.value } })
+  }
+}
 
 /**
  * 全局主题配置
@@ -143,6 +286,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 20px;
 }
 
 .logo {
@@ -154,11 +298,18 @@ body {
   font-family: 'Caveat', cursive;
   font-size: 1.5rem;
   font-weight: 700;
+  flex-shrink: 0;
+}
+
+.search-box {
+  flex: 1;
+  max-width: 400px;
 }
 
 .nav {
   display: flex;
   gap: 24px;
+  align-items: center;
 }
 
 .nav-link {
@@ -176,6 +327,10 @@ body {
 
 .nav-link.router-link-active {
   color: #2c3e50;
+}
+
+.user-name {
+  cursor: pointer;
 }
 
 .main-content {

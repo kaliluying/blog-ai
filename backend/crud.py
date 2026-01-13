@@ -26,10 +26,10 @@ from typing import List, Optional
 
 # 第三方库导入
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_, text
 
 # 内部模块导入
-from models import BlogPost
+from models import BlogPost, User, Comment
 from schemas import BlogPostCreate, BlogPostUpdate
 
 
@@ -78,7 +78,53 @@ def tags_from_json(json_str: str) -> List[str]:
         return []
 
 
-# ========== CRUD 操作函数 ==========
+# ========== 用户相关 CRUD ==========
+
+async def get_user_by_username(db: AsyncSession, username: str) -> Optional[User]:
+    """根据用户名获取用户"""
+    result = await db.execute(
+        select(User).where(User.username == username)
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
+    """根据邮箱获取用户"""
+    result = await db.execute(
+        select(User).where(User.email == email)
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_user_by_id(db: AsyncSession, user_id: int) -> Optional[User]:
+    """根据 ID 获取用户"""
+    result = await db.execute(
+        select(User).where(User.id == user_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def create_user(
+    db: AsyncSession,
+    username: str,
+    email: str,
+    hashed_password: str,
+    is_admin: bool = False
+) -> User:
+    """创建新用户"""
+    db_user = User(
+        username=username,
+        email=email,
+        hashed_password=hashed_password,
+        is_admin=is_admin
+    )
+    db.add(db_user)
+    await db.commit()
+    await db.refresh(db_user)
+    return db_user
+
+
+# ========== 文章相关 CRUD ==========
 
 async def get_posts(
     db: AsyncSession,
@@ -231,4 +277,104 @@ async def delete_post(db: AsyncSession, post_id: int) -> bool:
     await db.delete(db_post)
     await db.commit()
 
+    return True
+
+
+async def search_posts(
+    db: AsyncSession,
+    query: str,
+    skip: int = 0,
+    limit: int = 100
+) -> List[BlogPost]:
+    """
+    搜索文章
+
+    在标题和内容中搜索关键词。
+
+    Args:
+        db: 数据库会话
+        query: 搜索关键词
+        skip: 分页偏移
+        limit: 返回数量限制
+
+    Returns:
+        List[BlogPost]: 匹配的文章列表
+    """
+    # 使用 ILIKE 进行大小写不敏感搜索
+    search_pattern = f"%{query}%"
+    result = await db.execute(
+        select(BlogPost)
+        .where(
+            or_(
+                BlogPost.title.ilike(search_pattern),
+                BlogPost.content.ilike(search_pattern),
+                BlogPost.excerpt.ilike(search_pattern)
+            )
+        )
+        .order_by(BlogPost.date.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    return result.scalars().all()
+
+
+# ========== 评论相关 CRUD ==========
+
+async def get_comments_by_post(
+    db: AsyncSession,
+    post_id: int
+) -> List[Comment]:
+    """获取文章的所有顶级评论"""
+    result = await db.execute(
+        select(Comment)
+        .where(Comment.post_id == post_id, Comment.parent_id.is_(None))
+        .order_by(Comment.created_at.desc())
+    )
+    return result.scalars().all()
+
+
+async def get_comment_replies(
+    db: AsyncSession,
+    parent_id: int
+) -> List[Comment]:
+    """获取评论的所有回复"""
+    result = await db.execute(
+        select(Comment)
+        .where(Comment.parent_id == parent_id)
+        .order_by(Comment.created_at.asc())
+    )
+    return result.scalars().all()
+
+
+async def create_comment(
+    db: AsyncSession,
+    post_id: int,
+    user_id: int,
+    content: str,
+    parent_id: Optional[int] = None
+) -> Comment:
+    """创建评论"""
+    db_comment = Comment(
+        post_id=post_id,
+        user_id=user_id,
+        content=content,
+        parent_id=parent_id
+    )
+    db.add(db_comment)
+    await db.commit()
+    await db.refresh(db_comment)
+    return db_comment
+
+
+async def delete_comment(db: AsyncSession, comment_id: int) -> bool:
+    """删除评论"""
+    db_comment = await db.execute(
+        select(Comment).where(Comment.id == comment_id)
+    )
+    comment = db_comment.scalar_one_or_none()
+    if not comment:
+        return False
+
+    await db.delete(comment)
+    await db.commit()
     return True

@@ -11,6 +11,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 // 导入首页组件（同步加载，因为首页是主要入口）
 import Home from '@/views/Home.vue'
 
+// 导入 auth store（用于路由守卫）
+import { useAuthStore } from '@/stores/auth'
+
 /**
  * 创建路由实例
  *
@@ -25,9 +28,30 @@ const router = createRouter({
   routes: [
     // 根路径：首页
     {
-      path: '/',           // URL 路径
-      name: 'Home',        // 路由名称
-      component: Home      // 对应的视图组件
+      path: '/',
+      name: 'Home',
+      component: Home
+    },
+
+    // 登录页面
+    {
+      path: '/login',
+      name: 'Login',
+      component: () => import('@/views/Login.vue')
+    },
+
+    // 注册页面
+    {
+      path: '/register',
+      name: 'Register',
+      component: () => import('@/views/Register.vue')
+    },
+
+    // 搜索结果页面
+    {
+      path: '/search',
+      name: 'Search',
+      component: () => import('@/views/Search.vue')
     },
 
     // 文章详情页：动态路由参数 :id 表示文章 ID
@@ -66,6 +90,23 @@ const router = createRouter({
       component: () => import('@/views/AdminPostNew.vue')
     }
   ]
+})
+
+// ========== 导航守卫 ==========
+
+/**
+ * 全局前置守卫
+ * 等待 auth 初始化完成后再允许导航
+ */
+router.beforeEach(async (to, from, next) => {
+  const authStore = useAuthStore()
+
+  // 等待 auth 初始化完成
+  if (!authStore.initialized) {
+    await authStore.init()
+  }
+
+  next()
 })
 
 // 导出路由实例，供 main.ts 使用

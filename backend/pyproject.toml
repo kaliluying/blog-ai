@@ -11,4 +11,8 @@ dependencies = [
     "asyncpg>=0.29.0",
     "python-dotenv>=1.0.0",
     "pydantic>=2.0.0",
+    "pydantic[email]>=2.0.0",
+    "pwdlib[argon2]>=0.1.0",
+    "python-jose[cryptography]>=3.3.0",
+    "python-multipart>=0.0.21",
 ]

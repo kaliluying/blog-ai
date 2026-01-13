@@ -3,9 +3,11 @@
  *
  * 本模块使用 Axios 封装了与后端 FastAPI 服务器的所有 HTTP 请求。
  * 包含：
- * 1. Axios 实例配置（基础 URL、超时、拦截器）
+ * 1. Axios 实例配置（基础 URL、超时、拦截器、认证）
  * 2. BlogPost 接口类型定义
  * 3. 博客文章相关的 API 方法
+ * 4. 用户认证 API 方法
+ * 5. 评论 API 方法
  */
 
 import axios from 'axios'
@@ -31,22 +33,44 @@ const api = axios.create({
 })
 
 /**
+ * 请求拦截器 - 自动添加 Token
+ */
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token')
+    if (token) {
+      config.headers.set('Authorization', `Bearer ${token}`)
+    }
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
+
+/**
  * 响应拦截器
  *
  * 在请求响应后统一处理：
  * 1. 提取响应数据（response.data）
- * 2. 错误处理：打印错误信息并拒绝 Promise
+ * 2. 错误处理：静默处理 401（未授权），打印其他错误
  */
 api.interceptors.response.use(
   // 成功响应：直接返回 data 部分
   (response) => response.data,
 
-  // 错误响应：记录错误并抛出
+  // 错误响应
   (error) => {
+    // 401 未授权是预期情况，不打印错误
+    if (error.response?.status === 401) {
+      return Promise.reject(error)
+    }
     console.error('API Error:', error)
     return Promise.reject(error)
   }
 )
+
+// ========== 类型定义 ==========
 
 /**
  * 博客文章接口类型
@@ -64,9 +88,43 @@ export interface BlogPost {
 }
 
 /**
- * 博客 API 方法集合
- * 封装所有与文章相关的后端接口调用
+ * 用户类型
  */
+export interface User {
+  id: number
+  username: string
+  email: string
+  is_active: boolean
+  is_admin: boolean
+  created_at: string
+}
+
+/**
+ * Token 响应类型
+ */
+export interface TokenResponse {
+  access_token: string
+  token_type: string
+  user: User
+}
+
+/**
+ * 评论类型
+ */
+export interface Comment {
+  id: number
+  post_id: number
+  user_id: number
+  username: string
+  content: string
+  parent_id: number | null
+  created_at: string
+  updated_at: string
+  replies?: Comment[]
+}
+
+// ========== 博客 API ==========
+
 export const blogApi = {
   /**
    * 获取所有文章列表
@@ -111,6 +169,87 @@ export const blogApi = {
    */
   deletePost: async (id: number): Promise<void> => {
     return api.delete(`/api/posts/${id}`)
+  },
+
+  /**
+   * 搜索文章
+   * @param query 搜索关键词
+   * @returns Promise<BlogPost[]> 搜索结果
+   */
+  searchPosts: async (query: string): Promise<BlogPost[]> => {
+    return api.get('/api/search', { params: { q: query } })
+  }
+}
+
+// ========== 认证 API ==========
+
+export const authApi = {
+  /**
+   * 用户注册
+   * @param username 用户名
+   * @param email 邮箱
+   * @param password 密码
+   * @returns Promise<TokenResponse> Token 和用户信息
+   */
+  register: async (username: string, email: string, password: string): Promise<TokenResponse> => {
+    return api.post('/api/auth/register', { username, email, password })
+  },
+
+  /**
+   * 用户登录
+   * @param username 用户名
+   * @param password 密码
+   * @returns Promise<TokenResponse> Token 和用户信息
+   */
+  login: async (username: string, password: string): Promise<TokenResponse> => {
+    // OAuth2 需要 form-data 格式
+    const formData = new URLSearchParams()
+    formData.append('username', username)
+    formData.append('password', password)
+    return api.post('/api/auth/login', formData, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    })
+  },
+
+  /**
+    * 获取当前用户信息
+    * @returns Promise<User> 当前用户信息
+    */
+  getMe: async (): Promise<User> => {
+    return api.get('/api/auth/me')
+  }
+}
+
+// ========== 评论 API ==========
+
+export const commentApi = {
+  /**
+   * 获取文章的评论列表
+   * @param postId 文章 ID
+   * @returns Promise<Comment[]> 评论列表
+   */
+  getComments: async (postId: number): Promise<Comment[]> => {
+    return api.get(`/api/posts/${postId}/comments`)
+  },
+
+  /**
+   * 创建评论
+   * @param postId 文章 ID
+   * @param content 评论内容
+   * @param parentId 父评论 ID（可选，用于回复）
+   * @returns Promise<Comment> 创建的评论
+   */
+  createComment: async (postId: number, content: string, parentId?: number): Promise<Comment> => {
+    return api.post('/api/comments', { post_id: postId, content, parent_id: parentId })
+  },
+
+  /**
+   * 删除评论
+   * @param commentId 评论 ID
+   * @returns Promise<void>
+   */
+  deleteComment: async (commentId: number): Promise<void> => {
+    return api.delete(`/api/comments/${commentId}`)
   }
 }
 

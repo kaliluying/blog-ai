@@ -22,9 +22,54 @@ Pydantic 数据验证模式（Schemas）模块
 from datetime import datetime
 
 # 第三方库导入
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 
+
+# ========== 用户相关模式 ==========
+
+class UserBase(BaseModel):
+    """用户基础模式"""
+    username: str
+    email: EmailStr
+
+
+class UserCreate(UserBase):
+    """创建用户请求模式"""
+    password: str
+
+
+class UserLogin(BaseModel):
+    """用户登录请求模式"""
+    username: str
+    password: str
+
+
+class UserResponse(UserBase):
+    """用户响应模式"""
+    id: int
+    is_active: bool
+    is_admin: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class Token(BaseModel):
+    """Token 响应模式"""
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+
+class TokenData(BaseModel):
+    """Token 数据模式"""
+    username: Optional[str] = None
+    user_id: Optional[int] = None
+
+
+# ========== 文章相关模式 ==========
 
 class BlogPostBase(BaseModel):
     """
@@ -98,4 +143,51 @@ class BlogPostListItem(BaseModel):
 
         from_attributes: 允许从 ORM 模型创建 Pydantic 模型
         """
+        from_attributes = True
+
+
+# ========== 评论相关模式 ==========
+
+class CommentBase(BaseModel):
+    """评论基础模式"""
+    content: str
+
+
+class CommentCreate(CommentBase):
+    """创建评论请求模式"""
+    post_id: int
+    parent_id: Optional[int] = None  # 回复的评论 ID
+
+
+class CommentResponse(CommentBase):
+    """评论响应模式"""
+    id: int
+    post_id: int
+    user_id: int
+    username: str  # 评论者用户名
+    parent_id: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CommentWithReplies(CommentResponse):
+    """带回复的评论响应模式"""
+    replies: List[CommentResponse] = []
+
+
+# ========== 搜索相关模式 ==========
+
+class SearchResult(BaseModel):
+    """搜索结果模式"""
+    id: int
+    title: str
+    excerpt: str
+    date: datetime
+    tags: List[str] = []
+    score: Optional[float] = None  # 搜索相关性得分
+
+    class Config:
         from_attributes = True

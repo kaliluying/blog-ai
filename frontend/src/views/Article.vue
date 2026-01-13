@@ -61,6 +61,14 @@
         </div>
       </HandDrawnCard>
 
+      <!-- 评论区域 -->
+      <CommentSection
+        v-if="post"
+        :post-id="postId"
+        :comments="comments"
+        @refresh="fetchComments"
+      />
+
       <!-- 4. 文章不存在状态 -->
       <div v-else class="not-found">
         <HandDrawnCard title="文章不存在">
@@ -90,8 +98,11 @@ import HandDrawnCard from '@/components/HandDrawnCard.vue'
 import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
 
 // 导入 API 和工具函数
-import { blogApi, type BlogPost } from '@/api'
+import { blogApi, commentApi, type BlogPost, type Comment } from '@/api'
 import { renderMarkdownWithCodeSafe, decodeCode } from '@/utils/markdown'
+
+// 导入评论组件
+import CommentSection from '@/components/CommentSection.vue'
 
 // ========== 组合式函数 ==========
 
@@ -121,7 +132,22 @@ const loading = ref(false)
 // 错误信息（可为 null）
 const error = ref<string | null>(null)
 
+// 评论列表
+const comments = ref<Comment[]>([])
+
 // ========== 方法 ==========
+
+/**
+ * 获取文章评论
+ */
+const fetchComments = async () => {
+  try {
+    comments.value = await commentApi.getComments(postId.value)
+  } catch (e) {
+    console.error('获取评论失败:', e)
+    comments.value = []
+  }
+}
 
 /**
  * 获取文章详情
@@ -134,6 +160,9 @@ const fetchPost = async () => {
   try {
     // 调用 API 获取文章
     post.value = await blogApi.getPost(postId.value)
+
+    // 获取评论
+    await fetchComments()
 
     // 等待 DOM 更新后设置代码块复制按钮
     await nextTick()
