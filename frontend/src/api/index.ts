@@ -6,8 +6,7 @@
  * 1. Axios 实例配置（基础 URL、超时、拦截器、认证）
  * 2. BlogPost 接口类型定义
  * 3. 博客文章相关的 API 方法
- * 4. 用户认证 API 方法
- * 5. 评论 API 方法
+ * 4. 匿名评论 API 方法
  */
 
 import axios from 'axios'
@@ -33,11 +32,11 @@ const api = axios.create({
 })
 
 /**
- * 请求拦截器 - 自动添加 Token
+ * 请求拦截器 - 自动添加管理员 Token
  */
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('adminToken')
     if (token) {
       config.headers.set('Authorization', `Bearer ${token}`)
     }
@@ -109,39 +108,43 @@ export interface BlogPostUpdate {
 }
 
 /**
- * 用户类型
+ * 标题检查请求类型
  */
-export interface User {
-  id: number
-  username: string
-  email: string
-  is_active: boolean
-  is_admin: boolean
-  created_at: string
+export interface TitleCheckRequest {
+  title: string
+  excludeId?: number
 }
 
 /**
- * Token 响应类型
+ * 标题检查响应类型
  */
-export interface TokenResponse {
-  access_token: string
-  token_type: string
-  user: User
+export interface TitleCheckResponse {
+  exists: boolean
+  message: string
 }
 
 /**
- * 评论类型
+ * 匿名评论类型
  */
 export interface Comment {
   id: number
   post_id: number
-  user_id: number
-  username: string
+  nickname: string // 匿名评论者昵称
   content: string
   parent_id: number | null
   created_at: string
   updated_at: string
   replies?: Comment[]
+}
+
+/**
+ * 创建评论请求类型（匿名）
+ */
+export interface CommentCreate {
+  post_id: number
+  nickname: string
+  content: string
+  parent_id?: number
 }
 
 /**
@@ -169,10 +172,21 @@ export interface ArchiveYear {
 export const blogApi = {
   /**
    * 获取所有文章列表
+   * @param skip 跳过的记录数，默认 0
+   * @param limit 返回的最大记录数，默认 100
    * @returns Promise<BlogPost[]> 文章数组
    */
-  getPosts: async (): Promise<BlogPost[]> => {
-    return api.get('/api/posts')
+  getPosts: async (skip: number = 0, limit: number = 100): Promise<BlogPost[]> => {
+    return api.get('/api/posts', { params: { skip, limit } })
+  },
+
+  /**
+   * 获取文章总数
+   * @returns Promise<number> 文章总数
+   */
+  getPostCount: async (): Promise<number> => {
+    const response = (await api.get('/api/posts/count')) as { count: number }
+    return response.count ?? 0
   },
 
   /**
@@ -185,7 +199,16 @@ export const blogApi = {
   },
 
   /**
-   * 创建新文章
+   * 检查标题是否已存在
+   * @param data 标题检查请求
+   * @returns Promise<TitleCheckResponse> 检查结果
+   */
+  checkTitle: async (data: TitleCheckRequest): Promise<TitleCheckResponse> => {
+    return api.post('/api/posts/check-title', data)
+  },
+
+  /**
+   * 创建新文章（需要管理员认证）
    * @param post 文章数据（不含 id 和 date，由后端生成）
    * @returns Promise<BlogPost> 创建后的文章（含 id）
    */
@@ -194,7 +217,7 @@ export const blogApi = {
   },
 
   /**
-   * 更新文章
+   * 更新文章（需要管理员认证）
    * @param id 文章 ID
    * @param post 要更新的字段（部分更新）
    * @returns Promise<BlogPost> 更新后的文章
@@ -204,7 +227,7 @@ export const blogApi = {
   },
 
   /**
-   * 删除文章
+   * 删除文章（需要管理员认证）
    * @param id 要删除的文章 ID
    * @returns Promise<void>
    */
@@ -222,45 +245,6 @@ export const blogApi = {
   },
 }
 
-// ========== 认证 API ==========
-
-export const authApi = {
-  /**
-   * 用户注册
-   * @param username 用户名
-   * @param email 邮箱
-   * @param password 密码
-   * @returns Promise<TokenResponse> Token 和用户信息
-   */
-  register: async (username: string, email: string, password: string): Promise<TokenResponse> => {
-    return api.post('/api/auth/register', { username, email, password })
-  },
-
-  /**
-   * 用户登录
-   * @param username 用户名
-   * @param password 密码
-   * @returns Promise<TokenResponse> Token 和用户信息
-   */
-  login: async (username: string, password: string): Promise<TokenResponse> => {
-    // OAuth2 需要 form-data 格式
-    const formData = new URLSearchParams()
-    formData.append('username', username)
-    formData.append('password', password)
-    return api.post('/api/auth/login', formData, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    })
-  },
-
-  /**
-   * 获取当前用户信息
-   * @returns Promise<User> 当前用户信息
-   */
-  getMe: async (): Promise<User> => {
-    return api.get('/api/auth/me')
-  },
-}
-
 // ========== 评论 API ==========
 
 export const commentApi = {
@@ -274,18 +258,16 @@ export const commentApi = {
   },
 
   /**
-   * 创建评论
-   * @param postId 文章 ID
-   * @param content 评论内容
-   * @param parentId 父评论 ID（可选，用于回复）
+   * 创建匿名评论
+   * @param data 评论数据
    * @returns Promise<Comment> 创建的评论
    */
-  createComment: async (postId: number, content: string, parentId?: number): Promise<Comment> => {
-    return api.post('/api/comments', { post_id: postId, content, parent_id: parentId })
+  createComment: async (data: CommentCreate): Promise<Comment> => {
+    return api.post('/api/comments', data)
   },
 
   /**
-   * 删除评论
+   * 删除评论（需要管理员认证）
    * @param commentId 评论 ID
    * @returns Promise<void>
    */
@@ -333,6 +315,22 @@ export interface ViewCountResponse {
   view_count: number // 当前阅读量
 }
 
+/**
+ * 管理员登录请求类型
+ */
+export interface AdminLoginRequest {
+  password: string
+}
+
+/**
+ * 管理员登录响应类型
+ */
+export interface AdminLoginResponse {
+  success: boolean
+  message: string
+  token: string | null
+}
+
 // ========== 阅读量 API ==========
 
 export const viewApi = {
@@ -352,6 +350,27 @@ export const viewApi = {
    */
   getPopularPosts: async (limit: number = 5): Promise<BlogPost[]> => {
     return api.get('/api/posts/popular', { params: { limit } })
+  },
+}
+
+// ========== 管理员认证 API ==========
+
+export const adminApi = {
+  /**
+   * 管理员登录
+   * @param password 管理员密码
+   * @returns Promise<AdminLoginResponse> 登录结果及 token
+   */
+  login: async (password: string): Promise<AdminLoginResponse> => {
+    return api.post('/api/admin/login', { password })
+  },
+
+  /**
+   * 管理员登出
+   * @returns Promise<void>
+   */
+  logout: async (): Promise<void> => {
+    return api.post('/api/admin/logout')
   },
 }
 

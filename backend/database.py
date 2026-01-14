@@ -98,7 +98,7 @@ async def init_db():
     使用 SQLAlchemy 2.0 的 run_sync 方法同步执行 DDL。
     """
     # 导入模型，确保 metadata 包含所有表定义
-    from models import BlogPost, User, Comment
+    from models import BlogPost, Comment
 
     async with engine.begin() as conn:
         # 创建所有继承自 Base 的模型对应的表

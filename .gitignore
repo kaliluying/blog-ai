@@ -54,6 +54,7 @@ tmp/
 AGENTS.md
 CLAUDE.md
 .claude/
+.trae/
 
 # Ruff (Python linter)
 .ruff_cache/

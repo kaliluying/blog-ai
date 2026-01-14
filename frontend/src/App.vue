@@ -54,14 +54,13 @@
                   <nav class="nav">
                     <router-link to="/" class="nav-link">首页</router-link>
                     <template v-if="authStore.isLoggedIn">
-                      <router-link v-if="authStore.isAdmin" to="/admin/posts" class="nav-link">管理</router-link>
-                      <n-dropdown :options="userMenuOptions" @select="handleUserMenuSelect">
-                        <span class="nav-link user-name">{{ authStore.user?.username }}</span>
+                      <router-link to="/admin/posts" class="nav-link">管理</router-link>
+                      <n-dropdown :options="adminMenuOptions" @select="handleAdminMenuSelect">
+                        <span class="nav-link user-name">博主</span>
                       </n-dropdown>
                     </template>
                     <template v-else>
-                      <router-link to="/login" class="nav-link">登录</router-link>
-                      <router-link to="/register" class="nav-link">注册</router-link>
+                      <router-link to="/admin/posts" class="nav-link">管理</router-link>
                     </template>
                     <router-link to="/about" class="nav-link">关于</router-link>
                   </nav>
@@ -176,13 +175,8 @@ const authStore = useAuthStore()
 
 const searchQuery = ref('')
 
-// 用户菜单选项
-const userMenuOptions = [
-  {
-    label: '个人中心',
-    key: 'profile',
-    icon: () => h(NIcon, null, { default: () => h(UserIcon) })
-  },
+// 博主管理菜单选项
+const adminMenuOptions = [
   {
     label: '写文章',
     key: 'write',
@@ -196,12 +190,9 @@ const userMenuOptions = [
   }
 ]
 
-// 处理用户菜单选择
-const handleUserMenuSelect = (key: string) => {
+// 处理博主菜单选择
+const handleAdminMenuSelect = (key: string) => {
   switch (key) {
-    case 'profile':
-      router.push('/profile')
-      break
     case 'write':
       router.push('/admin/posts/new')
       break

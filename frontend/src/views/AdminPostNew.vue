@@ -114,8 +114,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 // 从 vue-router 导入路由功能
 import { useRouter, useRoute } from 'vue-router'
 
-// 从 naive-ui 导入消息提示
-import { useMessage } from 'naive-ui'
+// 从 naive-ui 导入消息提示和对话框
+import { useMessage, useDialog } from 'naive-ui'
 
 // 导入自定义手绘风格组件
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
@@ -125,6 +125,9 @@ import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
 // 导入 API 和工具函数
 import { blogApi, type BlogPostCreate, type BlogPostUpdate } from '@/api'
 import { renderMarkdownSafe } from '@/utils/markdown'
+
+// 导入 auth store
+import { useAuthStore } from '@/stores/auth'
 
 // ========== 类型定义 ==========
 
@@ -145,6 +148,43 @@ const route = useRoute()
 
 // 消息提示实例
 const message = useMessage()
+
+// 对话框实例
+const dialog = useDialog()
+
+// 认证状态
+const authStore = useAuthStore()
+
+// ========== 辅助函数 ==========
+
+// 显示登录对话框
+const showLoginDialog = () => {
+  const passwordRef = ref('')
+
+  dialog.create({
+    title: '博主登录',
+    content: '请输入管理员密码以继续',
+    positiveText: '登录',
+    negativeText: '返回',
+    maskClosable: false,
+    onPositiveClick: async () => {
+      if (!passwordRef.value) {
+        message.warning('请输入密码')
+        return false
+      }
+      const success = await authStore.login(passwordRef.value)
+      if (success) {
+        message.success('登录成功')
+        fetchPost()
+      } else {
+        message.error(authStore.error || '密码错误')
+      }
+    },
+    onNegativeClick: () => {
+      router.back()
+    }
+  })
+}
 
 // ========== 响应式状态 ==========
 
@@ -252,13 +292,24 @@ const checkTitleDuplicate = async () => {
   // 设置检查中状态
   titleValidation.value.checking = true
 
+  // 未登录时跳过标题检查
+  const token = localStorage.getItem('adminToken')
+  if (!token) {
+    titleValidation.value = {
+      checking: false,
+      exists: false,
+      message: ''
+    }
+    return
+  }
+
   try {
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
     const response = await fetch(`${apiBaseUrl}/api/posts/check-title`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        'Authorization': `Bearer ${localStorage.getItem('adminToken') || ''}`
       },
       body: JSON.stringify({
         title,
@@ -360,9 +411,19 @@ watch(() => formData.value.title, () => {
 
 // ========== 生命周期 ==========
 
-// 组件挂载时获取文章数据（编辑模式）
-onMounted(() => {
-  fetchPost()
+// 组件挂载时检查登录状态
+onMounted(async () => {
+  // 初始化 auth store
+  if (!authStore.initialized) {
+    await authStore.init()
+  }
+
+  // 未登录时显示登录对话框
+  if (!authStore.isLoggedIn) {
+    showLoginDialog()
+  } else {
+    fetchPost()
+  }
 })
 </script>
 

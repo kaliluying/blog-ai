@@ -21,7 +21,7 @@
               <n-tag v-for="tag in (post.tags || [])" :key="tag" size="small">
                 {{ tag }}
               </n-tag>
-              <span class="result-date">{{ formatDate(post.date) }}</span>
+              <span class="result-date">{{ formatShortDate(post.date) }}</span>
             </div>
           </div>
         </div>
@@ -45,6 +45,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { blogApi, type BlogPost } from '@/api'
+import { formatShortDate } from '@/utils/date'
 
 defineOptions({
   name: 'SearchPage'
@@ -55,10 +56,6 @@ const router = useRouter()
 const searchQuery = ref('')
 const results = ref<BlogPost[]>([])
 const loading = ref(false)
-
-const formatDate = (date: string) => {
-  return new Date(date).toLocaleDateString('zh-CN')
-}
 
 const performSearch = async () => {
   const query = route.query.q as string

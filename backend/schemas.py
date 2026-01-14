@@ -30,66 +30,8 @@ import re
 
 # ========== 用户相关模式 ==========
 
-
-class UserBase(BaseModel):
-    """用户基础模式"""
-
-    username: str = Field(..., min_length=3, max_length=50, pattern=r'^[a-zA-Z0-9_-]+$')
-    email: EmailStr
-
-
-class UserCreate(UserBase):
-    """创建用户请求模式"""
-
-    password: str = Field(..., min_length=8, max_length=128)
-
-    @field_validator('password')
-    @classmethod
-    def validate_password(cls, v: str) -> str:
-        """验证密码复杂度"""
-        if not re.search(r'[A-Za-z]', v):
-            raise ValueError('密码必须包含至少一个字母')
-        if not re.search(r'\d', v):
-            raise ValueError('密码必须包含至少一个数字')
-        return v
-
-
-class UserLogin(BaseModel):
-    """用户登录请求模式"""
-
-    username: str
-    password: str
-
-
-class UserResponse(UserBase):
-    """用户响应模式"""
-
-    id: int
-    is_active: bool
-    is_admin: bool
-    created_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-    @classmethod
-    def from_orm(cls, obj) -> "UserResponse":
-        """从 ORM 对象创建 Pydantic 模型"""
-        return cls.model_validate(obj)
-
-
-class Token(BaseModel):
-    """Token 响应模式"""
-
-    access_token: str
-    token_type: str = "bearer"
-    user: UserResponse
-
-
-class TokenData(BaseModel):
-    """Token 数据模式"""
-
-    username: Optional[str] = None
-    user_id: Optional[int] = None
+# 注意：用户系统已简化为仅博主管理
+# 普通用户无需注册登录即可发表评论
 
 
 # ========== 文章相关模式 ==========
@@ -144,11 +86,6 @@ class BlogPostResponse(BlogPostBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-    @classmethod
-    def from_orm(cls, obj) -> "BlogPostResponse":
-        """从 ORM 对象创建 Pydantic 模型"""
-        return cls.model_validate(obj)
-
 
 class BlogPostListItem(BaseModel):
     """文章列表项响应模式"""
@@ -162,11 +99,6 @@ class BlogPostListItem(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    @classmethod
-    def from_orm(cls, obj) -> "BlogPostListItem":
-        """从 ORM 对象创建 Pydantic 模型"""
-        return cls.model_validate(obj)
-
 
 # ========== 评论相关模式 ==========
 
@@ -178,29 +110,24 @@ class CommentBase(BaseModel):
 
 
 class CommentCreate(CommentBase):
-    """创建评论请求模式"""
+    """创建评论请求模式（匿名）"""
 
     post_id: int
+    nickname: str = Field(..., min_length=1, max_length=50, description="评论者昵称")
     parent_id: Optional[int] = None
 
 
 class CommentResponse(CommentBase):
-    """评论响应模式"""
+    """评论响应模式（匿名）"""
 
     id: int
     post_id: int
-    user_id: int
-    username: str
+    nickname: str
     parent_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
-
-    @classmethod
-    def from_orm(cls, obj) -> "CommentResponse":
-        """从 ORM 对象创建 Pydantic 模型"""
-        return cls.model_validate(obj)
 
 
 class CommentWithReplies(CommentResponse):
@@ -224,11 +151,6 @@ class SearchResult(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    @classmethod
-    def from_orm(cls, obj) -> "SearchResult":
-        """从 ORM 对象创建 Pydantic 模型"""
-        return cls.model_validate(obj)
-
 
 # ========== 归档相关模式 ==========
 
@@ -244,11 +166,6 @@ class ArchiveGroup(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    @classmethod
-    def from_orm(cls, obj) -> "ArchiveGroup":
-        """从 ORM 对象创建 Pydantic 模型"""
-        return cls.model_validate(obj)
-
 
 class ArchiveYear(BaseModel):
     """年度归档模式"""
@@ -258,8 +175,3 @@ class ArchiveYear(BaseModel):
     months: List[ArchiveGroup] = []
 
     model_config = ConfigDict(from_attributes=True)
-
-    @classmethod
-    def from_orm(cls, obj) -> "ArchiveYear":
-        """从 ORM 对象创建 Pydantic 模型"""
-        return cls.model_validate(obj)

@@ -33,6 +33,10 @@
               <HandDrawnIcon type="star" :size="18" />
               新建文章
             </n-button>
+            <!-- 登出按钮 -->
+            <n-button quaternary type="error" @click="handleLogout">
+              登出
+            </n-button>
           </div>
         </div>
 
@@ -49,8 +53,18 @@
         </div>
 
         <!-- 文章表格 -->
-        <n-data-table v-else :columns="columns" :data="filteredPosts" :bordered="false"
-          :row-key="(row: BlogPost) => row.id" />
+        <n-data-table
+          v-else
+          :columns="columns"
+          :data="paginatedPosts"
+          :bordered="false"
+          :row-key="(row: BlogPost) => row.id"
+          :pagination="paginationConfig"
+          :page-sizes="paginationConfig.pageSizes"
+          :item-count="filteredPosts.length"
+          @update:page="handlePageChange"
+          @update:page-size="handlePageSizeChange"
+        />
 
         <!-- 搜索无结果状态 -->
         <div v-if="filteredPosts.length === 0 && posts.length > 0" class="empty-state">
@@ -65,7 +79,7 @@
 
 <script setup lang="ts">
 // 从 vue 导入 Composition API 工具
-import { ref, computed, onMounted, h } from 'vue'
+import { ref, computed, onMounted, watch, h } from 'vue'
 
 // 从 vue-router 导入路由功能
 import { useRouter } from 'vue-router'
@@ -82,6 +96,7 @@ import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
 
 // 导入 Store 和 API
 import { useBlogStore } from '@/stores/blog'
+import { useAdminStore } from '@/stores/auth'
 import { blogApi, type BlogPost } from '@/api'
 import { formatDate } from '@/utils/date'
 
@@ -89,6 +104,9 @@ import { formatDate } from '@/utils/date'
 
 // 博客 Store 实例
 const blogStore = useBlogStore()
+
+// 管理员认证 Store 实例
+const adminStore = useAdminStore()
 
 // 路由实例
 const router = useRouter()
@@ -134,6 +152,17 @@ const filteredPosts = computed(() => {
   })
 })
 
+/**
+ * 分页后的文章列表（用于表格显示）
+ */
+const paginatedPosts = computed(() => {
+  const data = filteredPosts.value
+  const { page, pageSize } = paginationConfig.value
+  const start = (page - 1) * pageSize
+  const end = start + pageSize
+  return data.slice(start, end)
+})
+
 // ========== 方法 ==========
 
 /**
@@ -151,6 +180,13 @@ const handleDelete = async (id: number) => {
 }
 
 /**
+ * 管理员登出
+ */
+const handleLogout = () => {
+  adminStore.logout()
+}
+
+/**
  * 创建表格列配置
  * 使用 h 函数手动创建 JSX 风格的列渲染
  *
@@ -163,10 +199,14 @@ const createColumns = (): DataTableColumns<BlogPost> => [
     key: 'id',
     width: 60
   },
-  // 标题列（支持省略显示）
+  // 标题列（支持省略显示，可点击跳转）
   {
     title: '标题',
     key: 'title',
+    render: (row) => h('span', {
+      class: 'title-link',
+      onClick: () => router.push(`/article/${row.id}`)
+    }, row.title),
     ellipsis: true
   },
   // 标签列（渲染为标签数组）
@@ -209,11 +249,44 @@ const createColumns = (): DataTableColumns<BlogPost> => [
 // 创建列配置实例
 const columns = createColumns()
 
+// ========== 分页配置 ==========
+
+/**
+ * 分页配置
+ */
+const paginationConfig = ref({
+  page: 1,
+  pageSize: 10,
+  showSizePicker: true,
+  pageSizes: [10, 20, 50],
+  prefix: (info: { itemCount: number }) => `共 ${info.itemCount} 篇`
+})
+
+/**
+ * 处理分页变化
+ */
+const handlePageChange = (page: number) => {
+  paginationConfig.value.page = page
+}
+
+/**
+ * 处理每页数量变化
+ */
+const handlePageSizeChange = (size: number) => {
+  paginationConfig.value.pageSize = size
+  paginationConfig.value.page = 1
+}
+
 // ========== 生命周期 ==========
 
 // 组件挂载时获取文章列表
 onMounted(() => {
   blogStore.fetchPosts()
+})
+
+// 监听搜索关键词变化，重置分页
+watch(searchKeyword, () => {
+  paginationConfig.value.page = 1
 })
 </script>
 
@@ -314,5 +387,16 @@ onMounted(() => {
 
 :deep(.n-data-table-th) {
   padding: 12px 8px !important;
+}
+
+/* 标题链接样式 */
+:deep(.title-link) {
+  color: #2c3e50;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+:deep(.title-link:hover) {
+  color: #3498db;
 }
 </style>

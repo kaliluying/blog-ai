@@ -5,32 +5,27 @@
       评论 ({{ comments.length }})
     </h3>
 
-    <!-- 加载中状态 -->
-    <div v-if="!authStore.initialized" class="loading-state">
-      <n-spin size="small" />
-    </div>
-
-    <!-- 评论表单 -->
-    <div v-else-if="authStore.isLoggedIn" class="comment-form">
+    <!-- 评论表单（匿名评论） -->
+    <div class="comment-form">
       <n-input v-model:value="newComment" type="textarea" placeholder="写下你的评论..." :rows="3" />
       <div class="form-actions">
-        <n-button type="primary" :loading="submitting" :disabled="!newComment.trim()" @click="handleSubmit">
+        <div class="nickname-wrapper">
+          <n-input v-model:value="nickname" placeholder="你的昵称" class="nickname-input" :maxlength="50" show-count />
+          <n-button text size="small" @click="regenerateNickname" title="重新生成昵称" class="regenerate-btn">
+            🎲
+          </n-button>
+        </div>
+        <n-button type="primary" :loading="submitting" :disabled="!canSubmit" @click="handleSubmit">
           发布评论
         </n-button>
       </div>
-    </div>
-
-    <div v-else class="login-prompt">
-      <n-alert type="info" :show-icon="true">
-        <router-link to="/login">登录</router-link> 后才能发表评论
-      </n-alert>
     </div>
 
     <!-- 评论列表 -->
     <div v-if="comments.length > 0" class="comment-list">
       <div v-for="comment in comments" :key="comment.id" class="comment-item">
         <div class="comment-header">
-          <span class="comment-author">{{ comment.username }}</span>
+          <span class="comment-author">{{ comment.nickname }}</span>
           <span class="comment-date">{{ formatDate(comment.created_at) }}</span>
         </div>
 
@@ -40,7 +35,7 @@
           <n-button text size="small" @click="showReplyForm(comment.id)">
             回复
           </n-button>
-          <n-popconfirm v-if="canDelete(comment)" positive-text="确认删除" negative-text="取消"
+          <n-popconfirm v-if="adminStore.isLoggedIn" positive-text="确认删除" negative-text="取消"
             @positive-click="handleDelete(comment.id)">
             确定要删除这条评论吗？
             <template #trigger>
@@ -56,7 +51,7 @@
           <n-input v-model:value="replyContent" type="textarea" placeholder="写下你的回复..." :rows="2" />
           <div class="form-actions">
             <n-button size="small" @click="cancelReply">取消</n-button>
-            <n-button type="primary" size="small" :loading="submitting" :disabled="!replyContent.trim()"
+            <n-button type="primary" size="small" :loading="submitting" :disabled="!canReplySubmit"
               @click="handleReply(comment.id)">
               回复
             </n-button>
@@ -67,7 +62,7 @@
         <div v-if="comment.replies && comment.replies.length > 0" class="replies">
           <div v-for="reply in comment.replies" :key="reply.id" class="reply-item">
             <div class="reply-header">
-              <span class="reply-author">{{ reply.username }}</span>
+              <span class="reply-author">{{ reply.nickname }}</span>
               <span class="reply-date">{{ formatDate(reply.created_at) }}</span>
             </div>
             <div class="reply-content">{{ reply.content }}</div>
@@ -75,7 +70,7 @@
               <n-button text size="small" @click="showReplyForm(reply.id, comment.id)">
                 回复
               </n-button>
-              <n-popconfirm v-if="canDelete(reply)" positive-text="确认删除" negative-text="取消"
+              <n-popconfirm v-if="adminStore.isLoggedIn" positive-text="确认删除" negative-text="取消"
                 @positive-click="handleDelete(reply.id)">
                 确定要删除这条评论吗？
                 <template #trigger>
@@ -91,7 +86,7 @@
               <n-input v-model:value="replyContent" type="textarea" placeholder="写下你的回复..." :rows="2" />
               <div class="form-actions">
                 <n-button size="small" @click="cancelReply">取消</n-button>
-                <n-button type="primary" size="small" :loading="submitting" :disabled="!replyContent.trim()"
+                <n-button type="primary" size="small" :loading="submitting" :disabled="!canReplySubmit"
                   @click="handleReply(reply.id)">
                   回复
                 </n-button>
@@ -102,12 +97,12 @@
             <div v-if="reply.replies && reply.replies.length > 0" class="sub-replies">
               <div v-for="subReply in reply.replies" :key="subReply.id" class="sub-reply-item">
                 <div class="sub-reply-header">
-                  <span class="sub-reply-author">{{ subReply.username }}</span>
+                  <span class="sub-reply-author">{{ subReply.nickname }}</span>
                   <span class="sub-reply-date">{{ formatDate(subReply.created_at) }}</span>
                 </div>
                 <div class="sub-reply-content">{{ subReply.content }}</div>
                 <div class="sub-reply-actions">
-                  <n-popconfirm v-if="canDelete(subReply)" positive-text="确认删除" negative-text="取消"
+                  <n-popconfirm v-if="adminStore.isLoggedIn" positive-text="确认删除" negative-text="取消"
                     @positive-click="handleDelete(subReply.id)">
                     确定要删除这条评论吗？
                     <template #trigger>
@@ -129,10 +124,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useMessage, NPopconfirm } from 'naive-ui'
-import { useAuthStore } from '@/stores/auth'
+import { ref, onMounted, computed } from 'vue'
+import { useMessage } from 'naive-ui'
+import { useAdminStore } from '@/stores/auth'
 import { commentApi, type Comment } from '@/api'
 import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
 import { formatDate } from '@/utils/date'
@@ -146,33 +140,49 @@ const emit = defineEmits<{
   (e: 'refresh'): void
 }>()
 
-const router = useRouter()
 const message = useMessage()
-const authStore = useAuthStore()
+const adminStore = useAdminStore()
 
 const newComment = ref('')
+const nickname = ref('')
 const replyContent = ref('')
 const replyingTo = ref<number | null>(null)
 const replyingToParent = ref<number | null>(null)
 const submitting = ref(false)
 
-// 组件挂载时等待 auth 初始化完成
-onMounted(async () => {
-  if (!authStore.initialized) {
-    await authStore.init()
-  }
-})
+const randomNicknames = [
+  '好奇的猫咪', '爱思考的云朵', '路过的旅人', '安静的观察者',
+  '快乐的星星', '温柔的微风', '勇敢的小鸟', '智慧的树洞',
+  '神秘的访客', '温暖的阳光', '自由的飞鸟', '善良的小熊',
+  '可爱的兔子', '机智的狐狸', '优雅的天鹅', '活泼的松鼠',
+  '沉稳的大象', '灵动的蝴蝶', '坚定的山峰', '清澈的溪流'
+]
 
-const canDelete = (comment: Comment) => {
-  return authStore.isAdmin || comment.user_id === authStore.user?.id
+const generateNickname = () => {
+  const randomIndex = Math.floor(Math.random() * randomNicknames.length)
+  const randomNum = Math.floor(Math.random() * 1000)
+  return `${randomNicknames[randomIndex]}${randomNum}`
 }
 
+const regenerateNickname = () => {
+  nickname.value = generateNickname()
+  saveNickname(nickname.value)
+  message.info('已生成新昵称')
+}
+
+const saveNickname = (nick: string) => {
+  localStorage.setItem('commentNickname', nick)
+}
+
+const canSubmit = computed(() => {
+  return newComment.value.trim() && nickname.value.trim()
+})
+
+const canReplySubmit = computed(() => {
+  return replyContent.value.trim()
+})
+
 const showReplyForm = (commentId: number, parentId?: number) => {
-  if (!authStore.isLoggedIn) {
-    message.warning('请先登录后再回复')
-    router.push('/login')
-    return
-  }
   replyingTo.value = commentId
   replyingToParent.value = parentId || null
   replyContent.value = ''
@@ -185,56 +195,44 @@ const cancelReply = () => {
 }
 
 const handleSubmit = async () => {
-  if (!newComment.value.trim()) return
-  if (!authStore.isLoggedIn) {
-    message.warning('请先登录')
-    router.push('/login')
-    return
-  }
+  if (!canSubmit.value) return
 
   submitting.value = true
   try {
-    await commentApi.createComment(props.postId, newComment.value)
+    await commentApi.createComment({
+      post_id: props.postId,
+      nickname: nickname.value.trim(),
+      content: newComment.value.trim()
+    })
+    saveNickname(nickname.value)
     newComment.value = ''
     message.success('评论发布成功~')
     emit('refresh')
-  } catch (e: unknown) {
-    const error = e as { response?: { status?: number } }
-    if (error.response?.status === 401) {
-      message.warning('请先登录')
-      router.push('/login')
-    } else {
-      message.error('评论失败，请稍后重试')
-    }
+  } catch {
+    message.error('评论失败，请稍后重试')
   } finally {
     submitting.value = false
   }
 }
 
 const handleReply = async (parentId: number) => {
-  if (!replyContent.value.trim()) return
-  if (!authStore.isLoggedIn) {
-    message.warning('请先登录')
-    router.push('/login')
-    return
-  }
+  if (!canReplySubmit.value) return
 
   submitting.value = true
   try {
-    await commentApi.createComment(props.postId, replyContent.value, parentId)
+    await commentApi.createComment({
+      post_id: props.postId,
+      nickname: nickname.value.trim(),
+      content: replyContent.value.trim(),
+      parent_id: parentId
+    })
     replyContent.value = ''
     replyingTo.value = null
     replyingToParent.value = null
     message.success('回复发布成功~')
     emit('refresh')
-  } catch (e: unknown) {
-    const error = e as { response?: { status?: number } }
-    if (error.response?.status === 401) {
-      message.warning('请先登录')
-      router.push('/login')
-    } else {
-      message.error('回复失败，请稍后重试')
-    }
+  } catch {
+    message.error('回复失败，请稍后重试')
   } finally {
     submitting.value = false
   }
@@ -249,6 +247,19 @@ const handleDelete = async (commentId: number) => {
     message.error('删除失败，请稍后重试')
   }
 }
+
+onMounted(async () => {
+  if (!adminStore.initialized) {
+    await adminStore.init()
+  }
+  const storedNickname = localStorage.getItem('commentNickname')
+  if (storedNickname) {
+    nickname.value = storedNickname
+  } else {
+    nickname.value = generateNickname()
+    saveNickname(nickname.value)
+  }
+})
 </script>
 
 <style scoped>
@@ -275,16 +286,28 @@ const handleDelete = async (commentId: number) => {
 .form-actions {
   margin-top: 12px;
   display: flex;
-  justify-content: flex-end;
+  gap: 12px;
+  align-items: center;
 }
 
-.login-prompt {
-  margin-bottom: 24px;
+.nickname-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.login-prompt a {
-  color: #34495e;
-  font-weight: 600;
+.nickname-input {
+  width: 180px;
+}
+
+.regenerate-btn {
+  font-size: 18px;
+  padding: 4px 8px;
+  transition: transform 0.2s;
+}
+
+.regenerate-btn:hover {
+  transform: rotate(180deg);
 }
 
 .loading-state {

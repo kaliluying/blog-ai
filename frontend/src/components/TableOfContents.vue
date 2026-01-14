@@ -9,21 +9,25 @@
 -->
 <template>
   <nav v-if="headings.length > 0" class="toc-container">
-    <h4 class="toc-title">目录</h4>
-    <ul class="toc-list">
-      <li
-        v-for="heading in headings"
-        :key="heading.id"
-        :class="['toc-item', `toc-level-${heading.level}`, { active: activeId === heading.id }]"
-        @click="scrollTo(heading.id)"
-      >
-        {{ heading.text }}
-      </li>
-    </ul>
+    <HandDrawnCard class="toc-card">
+      <h4 class="toc-title">目录</h4>
+      <ul class="toc-list">
+        <li
+          v-for="heading in headings"
+          :key="heading.id"
+          :class="['toc-item', `toc-level-${heading.level}`, { active: activeId === heading.id }]"
+          @click="scrollTo(heading.id)"
+        >
+          {{ heading.text }}
+        </li>
+      </ul>
+    </HandDrawnCard>
   </nav>
 </template>
 
 <script setup lang="ts">
+import HandDrawnCard from '@/components/HandDrawnCard.vue'
+
 /**
  * 标题类型
  */
@@ -53,16 +57,17 @@ const scrollTo = (id: string) => {
   top: 100px;
   max-height: calc(100vh - 140px);
   overflow-y: auto;
+}
+
+.toc-card {
   padding: 16px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  min-width: 200px;
 }
 
 .toc-title {
   margin: 0 0 12px;
   font-family: 'Caveat', cursive;
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   color: #2c3e50;
   font-weight: normal;
 }
@@ -74,13 +79,14 @@ const scrollTo = (id: string) => {
 }
 
 .toc-item {
-  padding: 4px 8px;
-  margin: 2px 0;
+  padding: 6px 12px;
+  margin: 4px 0;
   color: #666;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   cursor: pointer;
-  border-left: 2px solid transparent;
-  transition: all 0.2s;
+  border-left: 3px solid transparent;
+  border-radius: 0 6px 6px 0;
+  transition: all 0.2s ease;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -88,46 +94,47 @@ const scrollTo = (id: string) => {
 
 .toc-item:hover {
   color: #3498db;
-  background: #f8f9fa;
+  background: rgba(52, 152, 219, 0.08);
+  border-left-color: rgba(52, 152, 219, 0.3);
 }
 
 .toc-item.active {
   color: #3498db;
   border-left-color: #3498db;
-  background: #f0f7ff;
+  background: rgba(52, 152, 219, 0.12);
   font-weight: 500;
 }
 
 /* 层级缩进 */
 .toc-level-1 {
-  padding-left: 8px;
+  padding-left: 12px;
 }
 
 .toc-level-2 {
-  padding-left: 20px;
-  font-size: 0.85rem;
+  padding-left: 24px;
+  font-size: 0.9rem;
 }
 
 .toc-level-3 {
-  padding-left: 32px;
-  font-size: 0.8rem;
+  padding-left: 36px;
+  font-size: 0.85rem;
 }
 
 /* 滚动条美化 */
-.toc-container::-webkit-scrollbar {
+.toc-list::-webkit-scrollbar {
   width: 4px;
 }
 
-.toc-container::-webkit-scrollbar-track {
+.toc-list::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.toc-container::-webkit-scrollbar-thumb {
+.toc-list::-webkit-scrollbar-thumb {
   background: #ddd;
   border-radius: 4px;
 }
 
-.toc-container::-webkit-scrollbar-thumb:hover {
+.toc-list::-webkit-scrollbar-thumb:hover {
   background: #bbb;
 }
 </style>

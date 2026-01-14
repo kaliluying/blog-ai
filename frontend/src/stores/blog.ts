@@ -51,6 +51,21 @@ export const useBlogStore = defineStore('blog', () => {
    */
   const popularPosts = ref<BlogPost[]>([])
 
+  /**
+   * 文章总数
+   */
+  const totalCount = ref(0)
+
+  /**
+   * 当前页码
+   */
+  const currentPage = ref(1)
+
+  /**
+   * 每页数量
+   */
+  const pageSize = ref(10)
+
   // ========== 方法定义 ==========
 
   /**
@@ -59,7 +74,36 @@ export const useBlogStore = defineStore('blog', () => {
    * 从后端 API 获取文章列表，更新 posts 状态。
    * 包含完整的错误处理。
    */
-  const fetchPosts = async () => {
+  const fetchPosts = async (page: number = 1, size: number = 10) => {
+    loading.value = true
+    error.value = null
+    originalError.value = null
+
+    currentPage.value = page
+    pageSize.value = size
+
+    const skip = (page - 1) * size
+
+    try {
+      const [postsData, countData] = await Promise.all([
+        blogApi.getPosts(skip, size),
+        blogApi.getPostCount(),
+      ])
+      posts.value = postsData || []
+      totalCount.value = typeof countData === 'number' ? countData : 0
+    } catch (e) {
+      error.value = '获取文章列表失败'
+      originalError.value = e instanceof Error ? e : new Error(String(e))
+      console.error(e)
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * 获取所有文章（不分页）
+   */
+  const fetchAllPosts = async () => {
     loading.value = true
     error.value = null
     originalError.value = null
@@ -133,36 +177,15 @@ export const useBlogStore = defineStore('blog', () => {
   }
 
   /**
-   * 记录文章浏览
+   * 记录并获取文章的阅读量
    *
-   * 调用后端 API 记录文章阅读量。
-   * 同一 IP 24 小时内只计一次。
-   *
-   * @param postId 文章 ID
-   * @returns 是否成功计数
-   */
-  const recordView = async (postId: number): Promise<boolean> => {
-    try {
-      const result: ViewCountResponse = await viewApi.recordView(postId)
-      // 更新文章阅读量
-      const post = posts.value.find((p) => p.id === postId)
-      if (post) {
-        post.view_count = result.view_count
-      }
-      return result.counted
-    } catch (e) {
-      console.error('记录浏览失败', e)
-      return false
-    }
-  }
-
-  /**
-   * 获取并更新文章的阅读量
+   * 调用后端 API 记录文章阅读量（同一 IP 24 小时内只计一次），
+   * 同时更新本地缓存的阅读量。
    *
    * @param postId 文章 ID
-   * @returns 当前阅读量
+   * @returns 当前阅读量，失败返回 0
    */
-  const updatePostViewCount = async (postId: number): Promise<number> => {
+  const recordAndGetViewCount = async (postId: number): Promise<number> => {
     try {
       const result: ViewCountResponse = await viewApi.recordView(postId)
       // 更新缓存中的阅读量
@@ -185,11 +208,14 @@ export const useBlogStore = defineStore('blog', () => {
     error,
     originalError,
     popularPosts,
+    totalCount,
+    currentPage,
+    pageSize,
     fetchPosts,
+    fetchAllPosts,
     getPostById,
     fetchPostById,
     fetchPopularPosts,
-    recordView,
-    updatePostViewCount,
+    recordAndGetViewCount,
   }
 })

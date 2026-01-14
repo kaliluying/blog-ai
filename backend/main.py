@@ -15,13 +15,14 @@ Blog AI 后端 API 主入口文件
 
 # 标准库导入
 import json
+import secrets
 from typing import List, Any
 
 # 第三方库导入
-from fastapi import FastAPI, Depends, HTTPException, status, Security, Request
+from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # 环境配置
@@ -33,35 +34,42 @@ dotenv.load_dotenv()
 
 # 内部模块导入
 from database import get_db
-from models import BlogPost, User, Comment
+from models import BlogPost, Comment
 from schemas import (
     BlogPostCreate,
     BlogPostUpdate,
     BlogPostResponse,
     BlogPostListItem,
-    UserCreate,
-    UserLogin,
-    UserResponse,
-    Token,
     CommentCreate,
     CommentResponse,
-    CommentWithReplies,
     SearchResult,
     ArchiveGroup,
     ArchiveYear,
     TitleCheckRequest,
     TitleCheckResponse,
 )
+
+
+# ========== 管理员认证 Pydantic 模型 ==========
+
+class AdminLoginRequest(BaseModel):
+    """管理员登录请求"""
+    password: str
+
+
+class AdminLoginResponse(BaseModel):
+    """管理员登录响应"""
+    success: bool
+    message: str
+    token: str | None = None
+
+
 from crud import (
     get_posts,
     get_post_by_id,
     create_post,
     update_post,
     delete_post,
-    get_user_by_username,
-    get_user_by_email,
-    create_user,
-    get_user_by_id,
     search_posts,
     get_comments_by_post,
     get_comment_replies,
@@ -74,13 +82,6 @@ from crud import (
     get_popular_posts,
     get_post_view_count,
     check_post_title_exists,
-)
-from auth import (
-    verify_password,
-    get_password_hash,
-    create_access_token,
-    decode_token,
-    oauth2_scheme,
 )
 
 from contextlib import asynccontextmanager
@@ -96,69 +97,52 @@ async def lifespan(app: FastAPI):
     yield
 
 
-# ========== 认证依赖函数 ==========
+# ========== 管理员认证依赖 ==========
+
+# 从环境变量读取管理员密码
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+
+# 旧版固定 token（用于兼容旧版本前端）
+ADMIN_TOKEN = "blog-admin-token"
+
+# 有效的管理员 session tokens（内存存储，生产环境建议用 Redis）
+valid_admin_tokens: set[str] = set()
 
 
-async def get_current_user(
-    token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
-) -> dict:
+def generate_admin_token() -> str:
+    """生成管理员 session token"""
+    return f"admin_{secrets.token_hex(32)}"
+
+
+async def verify_admin_password(password: str) -> bool:
+    """验证管理员密码"""
+    return password == ADMIN_PASSWORD
+
+
+async def get_current_admin(request: Request) -> bool:
     """
-    获取当前登录用户
-
-    作为 FastAPI 依赖使用，保护需要认证的路由。
+    验证管理员身份
+    支持新版 session token 和旧版固定 token（向后兼容）
     """
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="请先登录",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-    payload = decode_token(token)
-    user_id = payload.get("sub")
-
-    if user_id is None:
-        raise credentials_exception
-
-    # 确保 user_id 是整数
-    try:
-        user_id = int(user_id)
-    except (ValueError, TypeError):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="无效的认证令牌",
+            detail="需要管理员权限",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # 查询用户
-    from sqlalchemy import select
+    token = auth_header.replace("Bearer ", "")
 
-    result = await db.execute(
-        select(User).where(User.id == user_id, User.is_active == True)
-    )
-    user = result.scalar_one_or_none()
-
-    if user is None:
-        raise credentials_exception
-
-    return {
-        "id": user.id,
-        "username": user.username,
-        "email": user.email,
-        "is_active": user.is_active,
-        "is_admin": user.is_admin,
-        "created_at": user.created_at,
-    }
-
-
-async def get_current_admin(current_user: dict = Depends(get_current_user)) -> dict:
-    """
-    获取当前用户并验证是否为管理员
-    """
-    if not current_user.get("is_admin", False):
+    # 验证 token（新版 session token 或旧版固定 token）
+    if token not in valid_admin_tokens and token != ADMIN_TOKEN:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="需要管理员权限"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="无效的管理员令牌",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-    return current_user
+
+    return True
 
 
 # ========== FastAPI 应用初始化 ==========
@@ -189,6 +173,64 @@ app.add_middleware(
 )
 
 
+# ========== 管理员认证路由 ==========
+
+
+@app.post("/api/admin/login", response_model=AdminLoginResponse)
+async def admin_login(request_body: AdminLoginRequest):
+    """
+    管理员登录
+
+    验证密码后返回 session token。
+
+    Request Body:
+        password: 管理员密码（从环境变量 ADMIN_PASSWORD 读取）
+
+    Returns:
+        AdminLoginResponse: 登录结果及 token
+    """
+    password = request_body.password
+
+    if not password:
+        return AdminLoginResponse(
+            success=False,
+            message="请输入密码",
+            token=None
+        )
+
+    if password == ADMIN_PASSWORD:
+        # 生成新的 session token
+        token = generate_admin_token()
+        valid_admin_tokens.add(token)
+
+        return AdminLoginResponse(
+            success=True,
+            message="登录成功",
+            token=token
+        )
+    else:
+        return AdminLoginResponse(
+            success=False,
+            message="密码错误",
+            token=None
+        )
+
+
+@app.post("/api/admin/logout")
+async def admin_logout(request: Request):
+    """
+    管理员登出
+
+    使当前 session token 失效。
+    """
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.replace("Bearer ", "")
+        valid_admin_tokens.discard(token)
+
+    return {"message": "已登出"}
+
+
 # ========== 工具函数 ==========
 
 
@@ -209,14 +251,19 @@ MONTH_NAMES = {
 }
 
 
-def post_to_dict(post: BlogPost) -> dict:
-    """将 BlogPost ORM 模型转换为完整字典"""
+def parse_post_tags(post: BlogPost) -> List[str]:
+    """解析文章的 tags 字段，处理 JSON 字符串和列表两种格式"""
     tags = post.tags if post.tags else []
     if isinstance(tags, str):
         try:
             tags = json.loads(tags)
         except (json.JSONDecodeError, TypeError):
             tags = []
+    return tags if isinstance(tags, list) else []
+
+
+def post_to_dict(post: BlogPost) -> dict:
+    """将 BlogPost ORM 模型转换为完整字典"""
     return {
         "id": post.id,
         "title": post.title,
@@ -225,48 +272,29 @@ def post_to_dict(post: BlogPost) -> dict:
         "date": post.date,
         "created_at": post.created_at,
         "updated_at": post.updated_at,
-        "tags": tags if isinstance(tags, list) else [],
+        "tags": parse_post_tags(post),
         "view_count": post.view_count,
     }
 
 
 def post_to_list_item(post: BlogPost) -> dict:
     """将 BlogPost ORM 模型转换为列表项"""
-    tags = post.tags if post.tags else []
-    if isinstance(tags, str):
-        try:
-            tags = json.loads(tags)
-        except (json.JSONDecodeError, TypeError):
-            tags = []
     return {
         "id": post.id,
         "title": post.title,
         "excerpt": post.excerpt,
         "date": post.date,
-        "tags": tags if isinstance(tags, list) else [],
+        "tags": parse_post_tags(post),
         "view_count": post.view_count,
     }
 
 
-def user_to_dict(user: User) -> dict:
-    """将 User ORM 模型转换为字典"""
-    return {
-        "id": user.id,
-        "username": user.username,
-        "email": user.email,
-        "is_active": user.is_active,
-        "is_admin": user.is_admin,
-        "created_at": user.created_at,
-    }
-
-
-def comment_to_dict(comment: Comment, username: str = None) -> dict:
-    """将 Comment ORM 模型转换为字典"""
+def comment_to_dict(comment: Comment, nickname: str = None) -> dict:
+    """将 Comment ORM 模型转换为字典（匿名评论使用 nickname）"""
     return {
         "id": comment.id,
         "post_id": comment.post_id,
-        "user_id": comment.user_id,
-        "username": username or "Unknown",
+        "nickname": nickname or "匿名用户",
         "content": comment.content,
         "parent_id": comment.parent_id,
         "created_at": comment.created_at,
@@ -308,100 +336,6 @@ def group_posts_by_month(posts: List[BlogPost], year: int) -> List[ArchiveGroup]
 
 
 # ========== API 路由 ==========
-
-
-# ========== 认证路由 ==========
-
-
-@app.post("/api/auth/register", response_model=Token)
-async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
-    """
-    用户注册
-
-    Request Body:
-        username: 用户名
-        email: 邮箱
-        password: 密码
-
-    Returns:
-        Token: 访问令牌和用户信息
-    """
-    # 检查用户名或邮箱是否已存在
-    existing_user = await get_user_by_username(db, user_data.username)
-    existing_email = await get_user_by_email(db, user_data.email)
-    
-    if existing_user or existing_email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="该用户名或邮箱已被注册"
-        )
-
-    # 创建用户
-    hashed_password = get_password_hash(user_data.password)
-    # 生产环境：第一个用户不再自动成为管理员
-    # 管理员需要通过数据库手动设置或使用专门的创建管理员接口
-    db_user = await create_user(
-        db,
-        username=user_data.username,
-        email=user_data.email,
-        hashed_password=hashed_password,
-        is_admin=False,
-    )
-
-    # 生成令牌
-    access_token = create_access_token(data={"sub": db_user.id})
-
-    return {"access_token": access_token, "user": user_to_dict(db_user)}
-
-
-@app.post("/api/auth/login", response_model=Token)
-async def login(
-    form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)
-):
-    """
-    用户登录
-
-    Request Body (form-data):
-        username: 用户名
-        password: 密码
-
-    Returns:
-        Token: 访问令牌和用户信息
-    """
-    # 查找用户
-    user = await get_user_by_username(db, form_data.username)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="用户名或密码错误"
-        )
-
-    # 验证密码
-    if not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="用户名或密码错误"
-        )
-
-    # 检查账户状态
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="账户已被禁用"
-        )
-
-    # 生成令牌
-    access_token = create_access_token(data={"sub": user.id})
-
-    return {"access_token": access_token, "user": user_to_dict(user)}
-
-
-@app.get("/api/auth/me", response_model=UserResponse)
-async def get_me(current_user: dict = Depends(get_current_user)):
-    """
-    获取当前登录用户信息
-
-    Returns:
-        UserResponse: 当前用户信息
-    """
-    return current_user
 
 
 # ========== 文章搜索路由 ==========
@@ -446,9 +380,7 @@ async def get_comments(post_id: int, db: AsyncSession = Depends(get_db)):
         replies = await get_comment_replies(db, parent_id)
         reply_list = []
         for reply in replies:
-            reply_user = await get_user_by_id(db, reply.user_id)
-            reply_username = reply_user.username if reply_user else "Unknown"
-            reply_dict = comment_to_dict(reply, reply_username)
+            reply_dict = comment_to_dict(reply, reply.nickname)
             # 递归获取子回复
             reply_dict["replies"] = await get_replies_recursive(reply.id)
             reply_list.append(reply_dict)
@@ -459,14 +391,10 @@ async def get_comments(post_id: int, db: AsyncSession = Depends(get_db)):
 
     result = []
     for comment in comments:
-        # 获取评论者用户名
-        user = await get_user_by_id(db, comment.user_id)
-        username = user.username if user else "Unknown"
-
         # 获取回复（递归获取所有层级）
         reply_list = await get_replies_recursive(comment.id)
 
-        comment_dict = comment_to_dict(comment, username)
+        comment_dict = comment_to_dict(comment, comment.nickname)
         comment_dict["replies"] = reply_list
         result.append(comment_dict)
 
@@ -478,21 +406,21 @@ async def get_comments(post_id: int, db: AsyncSession = Depends(get_db)):
 )
 async def create_comment_route(
     comment_data: CommentCreate,
-    current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    创建评论
+    创建匿名评论
 
     Request Body:
         post_id: 文章 ID
+        nickname: 昵称
         content: 评论内容
         parent_id: 父评论 ID（可选，用于回复）
 
     Returns:
         CommentResponse: 创建的评论
 
-    Requires Authentication
+    无需登录，任何人都可以发表评论
     """
     # 验证文章是否存在
     post = await get_post_by_id(db, comment_data.post_id)
@@ -514,22 +442,22 @@ async def create_comment_route(
     comment = await create_comment(
         db,
         post_id=comment_data.post_id,
-        user_id=current_user["id"],
+        nickname=comment_data.nickname,
         content=comment_data.content,
         parent_id=comment_data.parent_id,
     )
 
-    return comment_to_dict(comment, current_user["username"])
+    return comment_to_dict(comment, comment.nickname)
 
 
 @app.delete("/api/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_comment_route(
     comment_id: int,
-    current_user: dict = Depends(get_current_user),
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """
-    删除评论
+    删除评论（仅管理员可操作）
 
     Path Parameters:
         comment_id: 评论 ID
@@ -537,9 +465,10 @@ async def delete_comment_route(
     Returns:
         None: 204 状态码无响应体
 
-    Requires Authentication
-    只有评论作者或管理员可以删除评论
+    Requires Admin Authentication
     """
+    await get_current_admin(request)
+
     # 获取评论
     from sqlalchemy import select
 
@@ -549,17 +478,27 @@ async def delete_comment_route(
     if not comment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="评论不存在")
 
-    # 检查权限：只有评论作者或管理员可以删除
-    if comment.user_id != current_user["id"] and not current_user.get("is_admin"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="无权删除此评论"
-        )
-
     await db.delete(comment)
     await db.commit()
 
 
 # ========== 文章路由 ==========
+
+
+@app.get("/api/posts/count")
+async def get_posts_count(db: AsyncSession = Depends(get_db)):
+    """
+    获取文章总数
+
+    Returns:
+        dict: 文章总数
+    """
+    from sqlalchemy import select, func
+
+    result = await db.execute(select(func.count(BlogPost.id)))
+    count = result.scalar_one_or_none() or 0
+
+    return {"count": count}
 
 
 @app.get("/api/posts")
@@ -653,8 +592,8 @@ async def record_post_view_route(
 
 @app.post("/api/posts/check-title")
 async def check_post_title(
-    request: TitleCheckRequest,
-    current_user: dict = Depends(get_current_admin),
+    request_body: TitleCheckRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -670,13 +609,15 @@ async def check_post_title(
 
     Requires Admin Authentication
     """
+    await get_current_admin(request)
+
     try:
-        exists = await check_post_title_exists(db, request.title, request.exclude_id)
+        exists = await check_post_title_exists(db, request_body.title, request_body.exclude_id)
 
         if exists:
             return TitleCheckResponse(
                 exists=True,
-                message=f"标题「{request.title}」已存在，请使用其他标题"
+                message=f"标题「{request_body.title}」已存在，请使用其他标题"
             )
         else:
             return TitleCheckResponse(
@@ -695,7 +636,7 @@ async def check_post_title(
 @app.post("/api/posts", status_code=status.HTTP_201_CREATED)
 async def create_new_post(
     post: BlogPostCreate,
-    current_user: dict = Depends(get_current_admin),
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -712,6 +653,8 @@ async def create_new_post(
 
     Requires Admin Authentication
     """
+    await get_current_admin(request)
+
     created_post = await create_post(db, post, tags=post.tags)
     return post_to_dict(created_post)
 
@@ -720,7 +663,7 @@ async def create_new_post(
 async def update_existing_post(
     post_id: int,
     post_update: BlogPostUpdate,
-    current_user: dict = Depends(get_current_admin),
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -740,6 +683,8 @@ async def update_existing_post(
 
     Requires Admin Authentication
     """
+    await get_current_admin(request)
+
     # 提取 tags（如果存在）
     tags = (
         post_update.tags
@@ -763,7 +708,7 @@ async def update_existing_post(
 @app.delete("/api/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_existing_post(
     post_id: int,
-    current_user: dict = Depends(get_current_admin),
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -780,6 +725,8 @@ async def delete_existing_post(
 
     Requires Admin Authentication
     """
+    await get_current_admin(request)
+
     success = await delete_post(db, post_id)
     if not success:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文章不存在")

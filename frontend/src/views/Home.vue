@@ -64,6 +64,19 @@
           <div v-if="!loading && posts.length === 0" class="empty-state">
             <p>暂无文章</p>
           </div>
+
+          <!-- 分页 -->
+          <div v-if="totalCount > pageSize" class="pagination-wrapper">
+            <n-pagination
+              v-model:page="currentPage"
+              :page-count="Math.ceil(totalCount / pageSize)"
+              :page-sizes="[5, 10, 20]"
+              :page-size="pageSize"
+              show-size-picker
+              @update:page="handlePageChange"
+              @update:page-size="handlePageSizeChange"
+            />
+          </div>
         </section>
       </section>
 
@@ -196,6 +209,9 @@ import { useRouter } from 'vue-router'
 // 从 stores 导入博客状态管理
 import { useBlogStore } from '@/stores/blog'
 
+// 分页配置
+const POSTS_PER_PAGE = 10
+
 // 导入自定义手绘风格组件
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
 import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
@@ -220,8 +236,22 @@ const blogStore = useBlogStore()
  * onMounted 是 Vue 的生命周期钩子，在 DOM 渲染完成后执行
  */
 onMounted(() => {
-  blogStore.fetchPosts()
+  blogStore.fetchPosts(1, POSTS_PER_PAGE)
 })
+
+/**
+ * 页码改变
+ */
+const handlePageChange = (page: number) => {
+  blogStore.fetchPosts(page, pageSize.value)
+}
+
+/**
+ * 每页数量改变
+ */
+const handlePageSizeChange = (size: number) => {
+  blogStore.fetchPosts(1, size)
+}
 
 // ========== 计算属性 ==========
 
@@ -230,6 +260,11 @@ const posts = computed(() => blogStore.posts)
 
 // 从 Store 获取加载状态（响应式）
 const loading = computed(() => blogStore.loading)
+
+// 从 Store 获取分页状态
+const totalCount = computed(() => blogStore.totalCount)
+const currentPage = computed(() => blogStore.currentPage)
+const pageSize = computed(() => blogStore.pageSize)
 
 /**
  * 获取所有标签（去重）
@@ -386,6 +421,13 @@ const goToTag = (tag: string) => {
 .loading-state p,
 .empty-state p {
   margin-top: 16px;
+}
+
+.pagination-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 32px;
+  padding: 20px 0;
 }
 
 .info-card {

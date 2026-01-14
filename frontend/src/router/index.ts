@@ -6,13 +6,32 @@
  */
 
 // 从 vue-router 导入创建路由和历史模式的函数
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { useAdminStore } from '@/stores/auth'
 
-// 导入首页组件（同步加载，因为首页是主要入口）
-import Home from '@/views/Home.vue'
-
-// 导入 auth store（用于路由守卫）
-import { useAuthStore } from '@/stores/auth'
+// 需要管理员权限的路由
+const adminRoutes: RouteRecordRaw[] = [
+  {
+    path: '/admin/login',
+    name: 'AdminLogin',
+    component: () => import('@/views/AdminLogin.vue')
+  },
+  {
+    path: '/admin/posts',
+    name: 'AdminPosts',
+    component: () => import('@/views/AdminPosts.vue')
+  },
+  {
+    path: '/admin/posts/new',
+    name: 'AdminPostNew',
+    component: () => import('@/views/AdminPostNew.vue')
+  },
+  {
+    path: '/admin/posts/:id',
+    name: 'AdminPostEdit',
+    component: () => import('@/views/AdminPostNew.vue')
+  }
+]
 
 /**
  * 创建路由实例
@@ -26,25 +45,11 @@ const router = createRouter({
 
   // 路由配置列表
   routes: [
-    // 根路径：首页
+    // 根路径：首页（懒加载）
     {
       path: '/',
       name: 'Home',
-      component: Home
-    },
-
-    // 登录页面
-    {
-      path: '/login',
-      name: 'Login',
-      component: () => import('@/views/Login.vue')
-    },
-
-    // 注册页面
-    {
-      path: '/register',
-      name: 'Register',
-      component: () => import('@/views/Register.vue')
+      component: () => import('@/views/Home.vue')
     },
 
     // 搜索结果页面
@@ -69,26 +74,8 @@ const router = createRouter({
       component: () => import('@/views/About.vue')
     },
 
-    // 管理页面：文章列表
-    {
-      path: '/admin/posts',
-      name: 'AdminPosts',
-      component: () => import('@/views/AdminPosts.vue')
-    },
-
-    // 管理页面：新建文章
-    {
-      path: '/admin/posts/new',
-      name: 'AdminPostNew',
-      component: () => import('@/views/AdminPostNew.vue')
-    },
-
-    // 管理页面：编辑文章
-    {
-      path: '/admin/posts/:id',
-      name: 'AdminPostEdit',
-      component: () => import('@/views/AdminPostNew.vue')
-    },
+    // 管理页面：文章列表（需要管理员密码）
+    ...adminRoutes,
 
     // 归档页面：文章归档列表
     {
@@ -113,22 +100,27 @@ const router = createRouter({
   ]
 })
 
-// ========== 导航守卫 ==========
+// 路由守卫：检查管理页面访问权限
+router.beforeEach((to, from, next) => {
+  const adminStore = useAdminStore()
 
-/**
- * 全局前置守卫
- * 等待 auth 初始化完成后再允许导航
- */
-router.beforeEach(async (to, from, next) => {
-  const authStore = useAuthStore()
-
-  // 等待 auth 初始化完成
-  if (!authStore.initialized) {
-    await authStore.init()
+  // 初始化 auth store（从 localStorage 恢复登录状态）
+  if (!adminStore.initialized) {
+    adminStore.init()
   }
 
-  next()
+  // 检查是否访问管理页面（排除登录页）
+  const isAdminRoute = to.path.startsWith('/admin/')
+  const isLoginPage = to.path === '/admin/login'
+
+  if (isAdminRoute && !isLoginPage && !adminStore.isLoggedIn) {
+    // 未登录访问管理页面，重定向到登录页
+    next({ name: 'AdminLogin', query: { redirect: to.fullPath } })
+  } else {
+    next()
+  }
 })
 
 // 导出路由实例，供 main.ts 使用
 export default router
+export { adminRoutes }

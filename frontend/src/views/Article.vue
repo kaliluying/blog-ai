@@ -277,7 +277,7 @@ const fetchPost = async () => {
     }, 50)
 
     // 记录浏览并更新阅读量（在获取文章完成后调用）
-    const newViewCount = await blogStore.updatePostViewCount(postId.value)
+    const newViewCount = await blogStore.recordAndGetViewCount(postId.value)
     // 如果 post.value 存在且不在缓存中，手动更新阅读量
     if (post.value) {
       post.value.view_count = newViewCount

@@ -23,50 +23,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, text
 
 # 内部模块导入
-from models import BlogPost, User, Comment
+from models import BlogPost, Comment
 from schemas import BlogPostCreate, BlogPostUpdate
 from utils.time import utc_now
-
-
-# ========== 用户相关 CRUD ==========
-
-
-async def get_user_by_username(db: AsyncSession, username: str) -> Optional[User]:
-    """根据用户名获取用户"""
-    result = await db.execute(select(User).where(User.username == username))
-    return result.scalar_one_or_none()
-
-
-async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
-    """根据邮箱获取用户"""
-    result = await db.execute(select(User).where(User.email == email))
-    return result.scalar_one_or_none()
-
-
-async def get_user_by_id(db: AsyncSession, user_id: int) -> Optional[User]:
-    """根据 ID 获取用户"""
-    result = await db.execute(select(User).where(User.id == user_id))
-    return result.scalar_one_or_none()
-
-
-async def create_user(
-    db: AsyncSession,
-    username: str,
-    email: str,
-    hashed_password: str,
-    is_admin: bool = False,
-) -> User:
-    """创建新用户"""
-    db_user = User(
-        username=username,
-        email=email,
-        hashed_password=hashed_password,
-        is_admin=is_admin,
-    )
-    db.add(db_user)
-    await db.commit()
-    await db.refresh(db_user)
-    return db_user
 
 
 # ========== 文章相关 CRUD ==========
@@ -301,13 +260,13 @@ async def get_comment_replies(db: AsyncSession, parent_id: int) -> List[Comment]
 async def create_comment(
     db: AsyncSession,
     post_id: int,
-    user_id: int,
+    nickname: str,
     content: str,
     parent_id: Optional[int] = None,
 ) -> Comment:
-    """创建评论"""
+    """创建匿名评论"""
     db_comment = Comment(
-        post_id=post_id, user_id=user_id, content=content, parent_id=parent_id
+        post_id=post_id, nickname=nickname, content=content, parent_id=parent_id
     )
     db.add(db_comment)
     await db.commit()

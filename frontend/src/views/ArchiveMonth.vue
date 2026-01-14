@@ -57,6 +57,7 @@ import { NSpin, NButton, NTag } from 'naive-ui'
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
 import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
 import { archiveApi, type ArchiveGroup } from '@/api'
+import { formatDate, MONTH_NAMES } from '@/utils/date'
 
 const router = useRouter()
 const route = useRoute()
@@ -69,12 +70,7 @@ const year = computed(() => Number(route.params.year))
 const month = computed(() => Number(route.params.month))
 
 const monthTitle = computed(() => {
-  const monthNames: Record<number, string> = {
-    1: '一月', 2: '二月', 3: '三月', 4: '四月',
-    5: '五月', 6: '六月', 7: '七月', 8: '八月',
-    9: '九月', 10: '十月', 11: '十一月', 12: '十二月'
-  }
-  return `${year.value}年 ${monthNames[month.value] || month.value}`
+  return `${year.value}年 ${MONTH_NAMES[month.value] || month.value}`
 })
 
 const fetchArchive = async () => {
@@ -89,14 +85,6 @@ const fetchArchive = async () => {
   } finally {
     loading.value = false
   }
-}
-
-const formatDate = (date: string) => {
-  return new Date(date).toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
 }
 
 const readMore = (id: number) => {
