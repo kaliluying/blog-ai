@@ -122,6 +122,9 @@ class BlogPost(Base):
     # 发布日期：默认为当前时间
     date = Column(DateTime, default=utc_now)
 
+    # 阅读量：默认为 0
+    view_count = Column(Integer, default=0, nullable=False, index=True)
+
     # 创建时间：默认为当前时间
     created_at = Column(DateTime, default=utc_now)
 

@@ -1,0 +1,169 @@
+<!--
+  PopularPosts.vue - 热门文章组件
+
+  本组件显示阅读量最高的文章列表。
+-->
+
+<template>
+  <HandDrawnCard class="info-card">
+    <h3 class="info-title">
+      <HandDrawnIcon type="star" :size="24" />
+      热门文章
+    </h3>
+    <!-- 加载状态 -->
+    <div v-if="loading" class="loading-state">
+      <n-spin size="small" />
+    </div>
+    <!-- 文章列表 -->
+    <ul v-else-if="posts.length > 0" class="popular-posts">
+      <li
+        v-for="(post, index) in posts"
+        :key="post.id"
+        class="popular-post-item"
+        @click="readMore(post.id)"
+      >
+        <span class="popular-post-rank">{{ index + 1 }}</span>
+        <div class="popular-post-content">
+          <span class="popular-post-title">{{ post.title }}</span>
+          <span class="popular-post-views">{{ post.view_count || 0 }} 次阅读</span>
+        </div>
+      </li>
+    </ul>
+    <!-- 空状态 -->
+    <p v-else class="empty-text">暂无热门文章</p>
+  </HandDrawnCard>
+</template>
+
+<script setup lang="ts">
+import { onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { useBlogStore } from '@/stores/blog'
+import HandDrawnCard from '@/components/HandDrawnCard.vue'
+import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
+
+// ========== 组合式函数 ==========
+
+const router = useRouter()
+const blogStore = useBlogStore()
+
+// ========== 生命周期 ==========
+
+onMounted(() => {
+  blogStore.fetchPopularPosts(5)
+})
+
+// ========== 计算属性 ==========
+
+const posts = computed(() => blogStore.popularPosts)
+const loading = computed(() => blogStore.loading)
+
+// ========== 方法 ==========
+
+const readMore = (id: number) => {
+  router.push(`/article/${id}`)
+}
+</script>
+
+<style scoped>
+.info-card {
+  width: 100%;
+}
+
+.info-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: 'Caveat', cursive;
+  font-size: 1.5rem;
+  color: #2c3e50;
+  margin: 0 0 16px 0;
+}
+
+.loading-state {
+  text-align: center;
+  padding: 20px;
+}
+
+.empty-text {
+  color: #7f8c8d;
+  text-align: center;
+  margin: 0;
+  padding: 20px 0;
+}
+
+.popular-posts {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.popular-post-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px dashed #e0e0e0;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.popular-post-item:last-child {
+  border-bottom: none;
+}
+
+.popular-post-item:hover {
+  padding-left: 8px;
+}
+
+.popular-post-rank {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f5f5;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: #7f8c8d;
+  flex-shrink: 0;
+}
+
+/* 前三名使用特殊颜色 */
+.popular-post-item:nth-child(1) .popular-post-rank {
+  background: #f1c40f;
+  color: #fff;
+}
+
+.popular-post-item:nth-child(2) .popular-post-rank {
+  background: #95a5a6;
+  color: #fff;
+}
+
+.popular-post-item:nth-child(3) .popular-post-rank {
+  background: #e67e22;
+  color: #fff;
+}
+
+.popular-post-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.popular-post-title {
+  font-size: 0.9rem;
+  color: #34495e;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popular-post-views {
+  font-size: 0.75rem;
+  color: #95a5a6;
+}
+</style>

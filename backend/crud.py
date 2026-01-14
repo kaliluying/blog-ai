@@ -21,7 +21,7 @@
 
 # 标准库导入
 import json
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 # 第三方库导入
@@ -415,3 +415,159 @@ async def get_archive_by_year(db: AsyncSession, year: int) -> List[BlogPost]:
         .order_by(BlogPost.date.desc())
     )
     return result.scalars().all()
+
+
+def get_utc_now():
+    """获取当前 UTC 时间（带时区信息）"""
+    return datetime.now(timezone.utc)
+
+
+async def get_post_view_count(db: AsyncSession, post_id: int) -> int:
+    """
+    获取文章阅读量
+
+    Args:
+        db: 数据库会话
+        post_id: 文章 ID
+
+    Returns:
+        int: 阅读量
+    """
+    # 直接查询 view_count 字段，避免获取整个文章对象
+    result = await db.execute(
+        select(BlogPost.view_count).where(BlogPost.id == post_id)
+    )
+    return result.scalar_one_or_none() or 0
+
+
+async def increment_post_view(db: AsyncSession, post_id: int) -> bool:
+    """
+    增加文章阅读量（原子操作）
+
+    Args:
+        db: 数据库会话
+        post_id: 文章 ID
+
+    Returns:
+        bool: 是否成功增加
+    """
+    from sqlalchemy import update
+
+    result = await db.execute(
+        update(BlogPost)
+        .where(BlogPost.id == post_id)
+        .values(view_count=BlogPost.view_count + 1)
+    )
+    await db.commit()
+    return result.rowcount > 0
+
+
+async def check_view_record_exists(db: AsyncSession, post_id: int, ip: str) -> bool:
+    """
+    检查该 IP 是否在 24 小时内已记录过浏览
+
+    Args:
+        db: 数据库会话
+        post_id: 文章 ID
+        ip: 客户端 IP
+
+    Returns:
+        bool: 是否已存在记录
+    """
+    # 查找 24 小时内该 IP 是否已有记录
+    result = await db.execute(
+        text("""
+            SELECT 1 FROM post_view_ips
+            WHERE post_id = :post_id AND ip = :ip
+            AND viewed_at > :expired_at
+            LIMIT 1
+        """),
+        {
+            "post_id": post_id,
+            "ip": ip,
+            "expired_at": get_utc_now() - timedelta(hours=24)
+        }
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def record_post_view(db: AsyncSession, post_id: int, ip: str) -> bool:
+    """
+    记录文章浏览（同一 IP 24 小时内只计一次）
+
+    Args:
+        db: 数据库会话
+        post_id: 文章 ID
+        ip: 客户端 IP
+
+    Returns:
+        bool: 是否成功计数（False 表示已在 24 小时内记录过）
+    """
+    now = get_utc_now()
+
+    # 检查是否已记录
+    if await check_view_record_exists(db, post_id, ip):
+        return False
+
+    # 记录新浏览（使用 ON CONFLICT DO NOTHING 处理并发）
+    result = await db.execute(
+        text("""
+            INSERT INTO post_view_ips (post_id, ip, viewed_at)
+            VALUES (:post_id, :ip, :viewed_at)
+            ON CONFLICT (post_id, ip) DO NOTHING
+        """),
+        {
+            "post_id": post_id,
+            "ip": ip,
+            "viewed_at": now
+        }
+    )
+
+    # 只有插入新记录时才增加阅读量
+    if result.rowcount > 0:
+        await increment_post_view(db, post_id)
+
+    return True
+
+
+async def get_popular_posts(db: AsyncSession, limit: int = 5) -> List[BlogPost]:
+    """
+    获取热门文章排行
+
+    Args:
+        db: 数据库会话
+        limit: 返回数量限制
+
+    Returns:
+        List[BlogPost]: 按阅读量降序排列的文章列表
+    """
+    result = await db.execute(
+        select(BlogPost)
+        .order_by(BlogPost.view_count.desc())
+        .limit(limit)
+    )
+    return result.scalars().all()
+
+
+async def cleanup_expired_view_records(db: AsyncSession, days: int = 30) -> int:
+    """
+    清理过期的浏览记录
+
+    Args:
+        db: 数据库会话
+        days: 保留天数，默认 30 天
+
+    Returns:
+        int: 删除的记录数
+    """
+    result = await db.execute(
+        text("""
+            DELETE FROM post_view_ips
+            WHERE viewed_at < :expired_at
+        """),
+        {
+            "expired_at": get_utc_now() - timedelta(days=days)
+        }
+    )
+    await db.commit()
+    return result.rowcount

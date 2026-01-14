@@ -53,6 +53,7 @@
                 <n-tag v-for="tag in post.tags" :key="tag" size="small" round>
                   {{ tag }}
                 </n-tag>
+                <span class="post-views">{{ post.view_count || 0 }} 次阅读</span>
                 <span class="post-date">{{ formatDate(post.date) }}</span>
               </div>
               <!-- 文章摘要 -->
@@ -133,7 +134,10 @@
           </div>
         </HandDrawnCard>
 
-        <!-- 4. 最新文章卡片 -->
+        <!-- 4. 热门文章卡片 -->
+        <PopularPosts />
+
+        <!-- 5. 最新文章卡片 -->
         <HandDrawnCard class="info-card">
           <h3 class="info-title">
             <HandDrawnIcon type="star" :size="24" />
@@ -152,7 +156,7 @@
           </ul>
         </HandDrawnCard>
 
-        <!-- 5. 文章归档卡片 -->
+        <!-- 6. 文章归档卡片 -->
         <HandDrawnCard class="info-card">
           <h3 class="info-title">
             <HandDrawnIcon type="star" :size="24" />
@@ -168,7 +172,7 @@
           </ul>
         </HandDrawnCard>
 
-        <!-- 6. 网站统计卡片 -->
+        <!-- 7. 网站统计卡片 -->
         <HandDrawnCard class="info-card">
           <h3 class="info-title">
             <HandDrawnIcon type="star" :size="24" />
@@ -205,6 +209,7 @@ import { useBlogStore } from '@/stores/blog'
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
 import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
 import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
+import PopularPosts from '@/components/PopularPosts.vue'
 
 // 导入共享工具函数
 import { formatDate, formatShortDate } from '@/utils/date'
@@ -364,6 +369,11 @@ const goToTag = (tag: string) => {
   font-size: 0.85rem;
   color: #7f8c8d;
   margin-left: auto;
+}
+
+.post-views {
+  font-size: 0.85rem;
+  color: #95a5a6;
 }
 
 .post-excerpt {

@@ -12,7 +12,7 @@
 
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { blogApi, type BlogPost } from '@/api'
+import { blogApi, viewApi, type BlogPost, type ViewCountResponse } from '@/api'
 
 /**
  * 创建博客 Store
@@ -38,6 +38,12 @@ export const useBlogStore = defineStore('blog', () => {
    * 当请求失败时存储错误描述
    */
   const error = ref<string | null>(null)
+
+  /**
+   * 热门文章列表
+   * 存储阅读量最高的文章
+   */
+  const popularPosts = ref<BlogPost[]>([])
 
   // ========== 方法定义 ==========
 
@@ -106,14 +112,78 @@ export const useBlogStore = defineStore('blog', () => {
     }
   }
 
+  /**
+   * 获取热门文章排行
+   *
+   * 从后端获取阅读量最高的文章列表。
+   *
+   * @param limit 返回数量，默认 5
+   */
+  const fetchPopularPosts = async (limit: number = 5) => {
+    try {
+      popularPosts.value = await viewApi.getPopularPosts(limit)
+    } catch (e) {
+      console.error('获取热门文章失败', e)
+    }
+  }
+
+  /**
+   * 记录文章浏览
+   *
+   * 调用后端 API 记录文章阅读量。
+   * 同一 IP 24 小时内只计一次。
+   *
+   * @param postId 文章 ID
+   * @returns 是否成功计数
+   */
+  const recordView = async (postId: number): Promise<boolean> => {
+    try {
+      const result: ViewCountResponse = await viewApi.recordView(postId)
+      // 更新文章阅读量
+      const post = posts.value.find(p => p.id === postId)
+      if (post) {
+        post.view_count = result.view_count
+      }
+      return result.counted
+    } catch (e) {
+      console.error('记录浏览失败', e)
+      return false
+    }
+  }
+
+  /**
+   * 获取并更新文章的阅读量
+   *
+   * @param postId 文章 ID
+   * @returns 当前阅读量
+   */
+  const updatePostViewCount = async (postId: number): Promise<number> => {
+    try {
+      const result: ViewCountResponse = await viewApi.recordView(postId)
+      // 更新缓存中的阅读量
+      const post = posts.value.find(p => p.id === postId)
+      if (post) {
+        post.view_count = result.view_count
+      }
+      return result.view_count
+    } catch (e) {
+      console.error('获取阅读量失败', e)
+      return 0
+    }
+  }
+
   // ========== 返回暴露的接口 ==========
 
   return {
     posts,           // 文章列表
     loading,         // 加载状态
     error,           // 错误信息
+    popularPosts,    // 热门文章
     fetchPosts,      // 获取所有文章
     getPostById,     // 查找文章（缓存）
-    fetchPostById    // 获取单篇文章
+    fetchPostById,   // 获取单篇文章
+    fetchPopularPosts, // 获取热门文章
+    recordView,      // 记录文章浏览
+    updatePostViewCount // 获取并更新阅读量
   }
 })

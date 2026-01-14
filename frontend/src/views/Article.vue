@@ -53,6 +53,8 @@
                   <n-tag v-for="tag in post.tags" :key="tag" size="small" round>
                     {{ tag }}
                   </n-tag>
+                  <!-- 阅读量 -->
+                  <span class="article-views">{{ post.view_count || 0 }} 次阅读</span>
                   <!-- 发布日期 -->
                   <span class="article-date">{{ formatDate(post.date) }}</span>
                 </div>
@@ -114,6 +116,9 @@ import { blogApi, commentApi, type BlogPost, type Comment } from '@/api'
 import { renderMarkdownWithCodeSafe, decodeCode } from '@/utils/markdown'
 import { formatDate } from '@/utils/date'
 
+// 导入博客 Store（用于记录浏览）
+import { useBlogStore } from '@/stores/blog'
+
 // 导入评论组件
 import CommentSection from '@/components/CommentSection.vue'
 
@@ -130,6 +135,9 @@ const router = useRouter()
 
 // 消息提示实例
 const message = useMessage()
+
+// 博客 Store 实例（用于记录浏览）
+const blogStore = useBlogStore()
 
 // ========== 响应式状态 ==========
 
@@ -269,6 +277,13 @@ const fetchPost = async () => {
       extractHeadings()
       setupScrollObserver()
     }, 50)
+
+    // 记录浏览并更新阅读量（在获取文章完成后调用）
+    const newViewCount = await blogStore.updatePostViewCount(postId.value)
+    // 如果 post.value 存在且不在缓存中，手动更新阅读量
+    if (post.value) {
+      post.value.view_count = newViewCount
+    }
   } catch (e) {
     // 获取失败：设置错误信息
     error.value = '获取文章失败'
@@ -353,14 +368,14 @@ const cleanupCopyButtons = () => {
 // ========== 生命周期 ==========
 
 // 组件挂载时获取文章
-onMounted(() => {
-  fetchPost()
+onMounted(async () => {
+  await fetchPost()  // fetchPost 内部会调用 recordView
 })
 
 // 监听路由参数变化（文章 ID 变化时重新获取）
-watch(() => route.params.id, () => {
+watch(() => route.params.id, async () => {
   post.value = null  // 先清空文章，确保触发更新
-  fetchPost()
+  await fetchPost()  // fetchPost 内部会调用 recordView
 })
 
 // 组件卸载时清理，防止内存泄漏
@@ -447,6 +462,10 @@ onUnmounted(() => {
 
 .article-date {
   color: #7f8c8d;
+}
+
+.article-views {
+  color: #95a5a6;
 }
 
 .article-content {

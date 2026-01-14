@@ -18,7 +18,7 @@ import json
 from typing import List, Any
 
 # 第三方库导入
-from fastapi import FastAPI, Depends, HTTPException, status, Security
+from fastapi import FastAPI, Depends, HTTPException, status, Security, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -33,7 +33,7 @@ import dotenv
 dotenv.load_dotenv()
 
 # 内部模块导入
-from database import get_db, init_db
+from database import get_db, init_db, async_session
 from models import BlogPost, User, Comment
 from schemas import (
     BlogPostCreate,
@@ -69,6 +69,9 @@ from crud import (
     get_archive_posts_by_year_month,
     get_archive_years,
     get_archive_by_year,
+    record_post_view,
+    get_popular_posts,
+    get_post_view_count,
 )
 from auth import (
     verify_password,
@@ -89,6 +92,25 @@ async def lifespan(app: FastAPI):
     在应用启动时初始化数据库表结构
     """
     await init_db()
+
+    # 创建 post_view_ips 表（如果不存在）
+    async with async_session() as session:
+        await session.execute(text("""
+            CREATE TABLE IF NOT EXISTS post_view_ips (
+                id SERIAL PRIMARY KEY,
+                post_id INTEGER NOT NULL,
+                ip VARCHAR(45) NOT NULL,
+                viewed_at TIMESTAMP NOT NULL,
+                UNIQUE(post_id, ip)
+            )
+        """))
+        # 创建索引用于查询
+        await session.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_post_view_ips_lookup
+            ON post_view_ips (post_id, ip, viewed_at)
+        """))
+        await session.commit()
+
     yield
     # 这里可以添加应用关闭时的清理逻辑
 
@@ -213,6 +235,7 @@ def post_to_dict(post: BlogPost) -> dict:
         "created_at": post.created_at,
         "updated_at": post.updated_at,
         "tags": json.loads(post.tags) if post.tags else [],
+        "view_count": post.view_count,
     }
 
 
@@ -224,6 +247,7 @@ def post_to_list_item(post: BlogPost) -> dict:
         "excerpt": post.excerpt,
         "date": post.date,
         "tags": json.loads(post.tags) if post.tags else [],
+        "view_count": post.view_count,
     }
 
 
@@ -572,6 +596,24 @@ async def list_posts(
     return [post_to_dict(p) for p in posts]
 
 
+@app.get("/api/posts/popular")
+async def get_popular_posts_route(
+    limit: int = 5,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取热门文章排行
+
+    Query Parameters:
+        limit: 返回数量限制，默认 5
+
+    Returns:
+        List[dict]: 热门文章列表
+    """
+    posts = await get_popular_posts(db, limit=limit)
+    return [post_to_list_item(p) for p in posts]
+
+
 @app.get("/api/posts/{post_id}")
 async def get_post(post_id: int, db: AsyncSession = Depends(get_db)):
     """
@@ -590,6 +632,38 @@ async def get_post(post_id: int, db: AsyncSession = Depends(get_db)):
     if post is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文章不存在")
     return post_to_dict(post)
+
+
+@app.post("/api/posts/{post_id}/view")
+async def record_post_view_route(
+    post_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    记录文章浏览（同一 IP 24 小时内只计一次）
+
+    Path Parameters:
+        post_id: 文章 ID
+
+    Returns:
+        dict: 是否成功计数及当前阅读量
+    """
+    # 验证文章是否存在
+    post = await get_post_by_id(db, post_id)
+    if post is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文章不存在")
+
+    # 获取真实 IP（处理代理情况）
+    client_ip = request.headers.get("X-Real-IP", request.client.host)
+
+    # 记录浏览
+    counted = await record_post_view(db, post_id, client_ip)
+
+    # 返回当前阅读量
+    current_count = await get_post_view_count(db, post_id)
+
+    return {"counted": counted, "view_count": current_count}
 
 
 @app.post("/api/posts", status_code=status.HTTP_201_CREATED)

@@ -126,6 +126,7 @@ class BlogPostResponse(BlogPostBase):
     created_at: datetime  # 创建时间
     updated_at: datetime  # 更新时间
     tags: List[str] = []  # 标签列表
+    view_count: int = 0  # 阅读量
 
     class Config:
         """
@@ -150,6 +151,7 @@ class BlogPostListItem(BaseModel):
     excerpt: str  # 摘要
     date: datetime  # 发布日期
     tags: List[str] = []  # 标签
+    view_count: int = 0  # 阅读量
 
     class Config:
         """

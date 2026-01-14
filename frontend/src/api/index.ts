@@ -85,6 +85,7 @@ export interface BlogPost {
   tags: string[]          // 标签数组
   created_at?: string    // 创建时间（可选）
   updated_at?: string    // 更新时间（可选）
+  view_count?: number    // 阅读量（可选）
 }
 
 /**
@@ -303,6 +304,36 @@ export const commentApi = {
      return api.get(`/api/archive/${year}/${month}`)
    }
  }
+
+/**
+ * 阅读量响应类型
+ */
+export interface ViewCountResponse {
+  counted: boolean  // 是否成功计数
+  view_count: number  // 当前阅读量
+}
+
+// ========== 阅读量 API ==========
+
+export const viewApi = {
+  /**
+   * 记录文章浏览
+   * @param postId 文章 ID
+   * @returns Promise<ViewCountResponse> 是否计数及当前阅读量
+   */
+  recordView: async (postId: number): Promise<ViewCountResponse> => {
+    return api.post(`/api/posts/${postId}/view`)
+  },
+
+  /**
+   * 获取热门文章排行
+   * @param limit 返回数量，默认 5
+   * @returns Promise<BlogPost[]> 热门文章列表
+   */
+  getPopularPosts: async (limit: number = 5): Promise<BlogPost[]> => {
+    return api.get('/api/posts/popular', { params: { limit } })
+  }
+}
 
 // 导出 Axios 实例（可自定义配置时使用）
 export default api
