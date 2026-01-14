@@ -26,7 +26,7 @@ const processLink = (_: string, text: string, url: string): string => {
  * 通用 Markdown 转换配置
  * 包含除代码块外的所有转换规则
  */
-const COMMON_TRANSFORMATIONS: Array<[RegExp, string | ((...args: string[]) => string)]> = [
+const COMMON_TRANSFORMATIONS: Array<[RegExp, string]> = [
   // 行内代码
   [/`([^`]+)`/g, '<code>$1</code>'],
   // 粗体
@@ -35,8 +35,6 @@ const COMMON_TRANSFORMATIONS: Array<[RegExp, string | ((...args: string[]) => st
   [/\*([^*]+)\*/g, '<em>$1</em>'],
   // 删除线
   [/~~([^~]+)~~/g, '<del>$1</del>'],
-  // 链接
-  [/\[([^\]]+)\]\(([^)]+)\)/g, processLink],
   // 引用
   [/^> (.+)$/gm, '<blockquote>$1</blockquote>'],
   // 标题
@@ -71,6 +69,9 @@ const applyCommonTransformations = (text: string, codeBlockHandler?: (match: str
   for (const [pattern, replacement] of COMMON_TRANSFORMATIONS) {
     result = result.replace(pattern, replacement)
   }
+
+  // 链接单独处理
+  result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, processLink)
 
   return result
 }

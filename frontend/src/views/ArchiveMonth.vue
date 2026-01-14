@@ -79,7 +79,7 @@ const monthTitle = computed(() => {
     5: '五月', 6: '六月', 7: '七月', 8: '八月',
     9: '九月', 10: '十月', 11: '十一月', 12: '十二月'
   }
-  return `${year.value}年 ${monthNames[month.value] || month.value}月`
+  return `${year.value}年 ${monthNames[month.value] || month.value}`
 })
 
 const fetchArchive = async () => {

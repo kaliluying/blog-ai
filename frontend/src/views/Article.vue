@@ -5,7 +5,8 @@
   1. 文章标题和元信息（标签、日期）
   2. Markdown 格式的文章内容渲染
   3. 代码块复制功能
-  4. 加载状态、错误状态和不存在状态的友好提示
+  4. 文章目录（TOC）
+  5. 加载状态、错误状态和不存在状态的友好提示
 -->
 
 <template>
@@ -36,38 +37,49 @@
       </div>
 
       <!-- 3. 文章内容 -->
-      <HandDrawnCard v-else-if="post" class="article-card">
-        <!-- 文章头部：标题和元信息 -->
-        <div class="article-header">
-          <h1 class="article-title">{{ post.title }}</h1>
-          <div class="article-meta">
-            <!-- 标签列表 -->
-            <n-tag v-for="tag in post.tags" :key="tag" size="small" round>
-              {{ tag }}
-            </n-tag>
-            <!-- 发布日期 -->
-            <span class="article-date">{{ formatDate(post.date) }}</span>
+      <template v-else-if="post">
+        <div class="article-layout">
+          <!-- 左侧：文章主体 -->
+          <div class="article-main">
+            <HandDrawnCard class="article-card">
+              <!-- 文章头部：标题和元信息 -->
+              <div class="article-header">
+                <n-button quaternary @click="router.back()" class="back-btn">
+                  ← 返回
+                </n-button>
+                <h1 class="article-title">{{ post.title }}</h1>
+                <div class="article-meta">
+                  <!-- 标签列表 -->
+                  <n-tag v-for="tag in post.tags" :key="tag" size="small" round>
+                    {{ tag }}
+                  </n-tag>
+                  <!-- 发布日期 -->
+                  <span class="article-date">{{ formatDate(post.date) }}</span>
+                </div>
+              </div>
+
+              <!-- 文章内容：使用 v-html 渲染 Markdown 转换后的 HTML（已消毒） -->
+              <div class="article-content" ref="contentRef" v-html="safeContent"></div>
+            </HandDrawnCard>
+
+            <!-- 评论区域 -->
+            <CommentSection
+              :post-id="postId"
+              :comments="comments"
+              @refresh="fetchComments"
+            />
           </div>
+
+          <!-- 右侧：目录 -->
+          <aside class="article-sidebar">
+            <TableOfContents
+              :headings="headings"
+              :active-id="activeHeadingId"
+              @select="scrollToHeading"
+            />
+          </aside>
         </div>
-
-        <!-- 文章内容：使用 v-html 渲染 Markdown 转换后的 HTML（已消毒） -->
-        <div class="article-content" ref="contentRef" v-html="safeContent"></div>
-
-        <!-- 文章底部：返回按钮 -->
-        <div class="article-footer">
-          <n-button quaternary @click="router.back()">
-            ← 返回首页
-          </n-button>
-        </div>
-      </HandDrawnCard>
-
-      <!-- 评论区域 -->
-      <CommentSection
-        v-if="post"
-        :post-id="postId"
-        :comments="comments"
-        @refresh="fetchComments"
-      />
+      </template>
 
       <!-- 4. 文章不存在状态 -->
       <div v-else class="not-found">
@@ -105,6 +117,9 @@ import { formatDate } from '@/utils/date'
 // 导入评论组件
 import CommentSection from '@/components/CommentSection.vue'
 
+// 导入目录组件
+import TableOfContents from '@/components/TableOfContents.vue'
+
 // ========== 组合式函数 ==========
 
 // 路由参数（获取文章 ID）
@@ -135,6 +150,87 @@ const error = ref<string | null>(null)
 
 // 评论列表
 const comments = ref<Comment[]>([])
+
+// 目录标题列表
+const headings = ref<Array<{ id: string; text: string; level: number }>>([])
+
+// 当前高亮的标题 ID
+const activeHeadingId = ref<string>('')
+
+// 滚动观察器
+let scrollObserver: IntersectionObserver | null = null
+
+// ========== TOC 方法 ==========
+
+/**
+ * 提取文章中的标题
+ */
+const extractHeadings = () => {
+  if (!contentRef.value) return
+
+  headings.value = []
+  const elements = contentRef.value.querySelectorAll('h1, h2, h3')
+
+  elements.forEach((el, index) => {
+    const id = `heading-${index}`
+    el.id = id
+    headings.value.push({
+      id,
+      text: el.textContent || '',
+      level: parseInt(el.tagName.charAt(1))
+    })
+  })
+}
+
+/**
+ * 设置滚动观察器
+ */
+const setupScrollObserver = () => {
+  // 断开之前的观察器
+  if (scrollObserver) {
+    scrollObserver.disconnect()
+  }
+
+  scrollObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          activeHeadingId.value = entry.target.id
+        }
+      })
+    },
+    {
+      rootMargin: '-80px 0px -70% 0px',
+      threshold: 0
+    }
+  )
+
+  headings.value.forEach(h => {
+    const el = document.getElementById(h.id)
+    if (el) scrollObserver?.observe(el)
+  })
+}
+
+/**
+ * 滚动到指定标题
+ */
+const scrollToHeading = (id: string) => {
+  const el = document.getElementById(id)
+  if (el) {
+    const top = el.getBoundingClientRect().top + window.scrollY - 80
+    window.scrollTo({ top, behavior: 'smooth' })
+  }
+}
+
+/**
+ * 清理滚动观察器
+ */
+const cleanupScrollObserver = () => {
+  if (scrollObserver) {
+    scrollObserver.disconnect()
+    scrollObserver = null
+  }
+}
 
 // ========== 方法 ==========
 
@@ -170,6 +266,8 @@ const fetchPost = async () => {
     // 延迟一下确保 v-html 完全渲染
     setTimeout(() => {
       setupCopyButtons()
+      extractHeadings()
+      setupScrollObserver()
     }, 50)
   } catch (e) {
     // 获取失败：设置错误信息
@@ -265,9 +363,10 @@ watch(() => route.params.id, () => {
   fetchPost()
 })
 
-// 组件卸载时清理复制按钮，防止内存泄漏
+// 组件卸载时清理，防止内存泄漏
 onUnmounted(() => {
   cleanupCopyButtons()
+  cleanupScrollObserver()
 })
 </script>
 
@@ -281,23 +380,61 @@ onUnmounted(() => {
 .article-container {
   position: relative;
   z-index: 1;
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
+}
+
+.article-layout {
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: 32px;
+}
+
+.article-main {
+  min-width: 0;
+}
+
+.article-sidebar {
+  position: relative;
 }
 
 .article-card {
   width: 100%;
 }
 
+/* 响应式：小屏幕隐藏 TOC */
+@media (max-width: 1024px) {
+  .article-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .article-sidebar {
+    display: none;
+  }
+
+  .article-container {
+    max-width: 800px;
+  }
+}
+
 .article-header {
+  position: relative;
   text-align: center;
+  padding-top: 16px;
+}
+
+.back-btn {
+  position: absolute;
+  left: 0;
+  top: 16px;
 }
 
 .article-title {
   font-family: 'Caveat', cursive;
   font-size: 2.5rem;
   color: #2c3e50;
-  margin: 0 0 16px 0;
+  margin: 16px 0 16px 0;
+  padding: 0 60px;
 }
 
 .article-meta {
@@ -406,10 +543,6 @@ onUnmounted(() => {
 
 .article-content :deep(pre .copy-btn.copied) {
   color: #27ae60;
-}
-
-.article-footer {
-  padding-top: 20px;
 }
 
 .not-found {
