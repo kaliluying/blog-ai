@@ -57,3 +57,7 @@ CLAUDE.md
 
 # Ruff (Python linter)
 .ruff_cache/
+
+# Alembic
+alembic/versions/*.py
+!alembic/versions/README

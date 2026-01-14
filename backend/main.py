@@ -23,7 +23,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
 
 # 环境配置
 import os
@@ -33,7 +32,7 @@ import dotenv
 dotenv.load_dotenv()
 
 # 内部模块导入
-from database import get_db, init_db, async_session
+from database import get_db
 from models import BlogPost, User, Comment
 from schemas import (
     BlogPostCreate,
@@ -92,89 +91,9 @@ async def lifespan(app: FastAPI):
     """
     应用生命周期事件处理器
 
-    在应用启动时初始化数据库表结构
+    数据库迁移由 Alembic 管理（migrations/ 目录）
     """
-    await init_db()
-
-    # 创建 post_view_ips 表（如果不存在）
-    async with async_session() as session:
-        await session.execute(text("""
-            CREATE TABLE IF NOT EXISTS post_view_ips (
-                id SERIAL PRIMARY KEY,
-                post_id INTEGER NOT NULL,
-                ip VARCHAR(45) NOT NULL,
-                viewed_at TIMESTAMP WITH TIME ZONE NOT NULL,
-                UNIQUE(post_id, ip)
-            )
-        """))
-        # 迁移现有表到 TIMESTAMP WITH TIME ZONE
-        await session.execute(text("""
-            DO $$
-            BEGIN
-                -- 迁移 post_view_ips.viewed_at
-                IF EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'post_view_ips'
-                    AND column_name = 'viewed_at'
-                    AND data_type = 'timestamp without time zone'
-                ) THEN
-                    ALTER TABLE post_view_ips
-                    ALTER COLUMN viewed_at TYPE TIMESTAMP WITH TIME ZONE
-                    USING viewed_at AT TIME ZONE 'UTC';
-                END IF;
-
-                -- 迁移 users.created_at
-                IF EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'users'
-                    AND column_name = 'created_at'
-                    AND data_type = 'timestamp without time zone'
-                ) THEN
-                    ALTER TABLE users
-                    ALTER COLUMN created_at TYPE TIMESTAMP WITH TIME ZONE
-                    USING created_at AT TIME ZONE 'UTC';
-                END IF;
-
-                -- 迁移 comments.created_at 和 updated_at
-                IF EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'comments'
-                    AND column_name = 'created_at'
-                    AND data_type = 'timestamp without time zone'
-                ) THEN
-                    ALTER TABLE comments
-                    ALTER COLUMN created_at TYPE TIMESTAMP WITH TIME ZONE
-                    USING created_at AT TIME ZONE 'UTC',
-                    ALTER COLUMN updated_at TYPE TIMESTAMP WITH TIME ZONE
-                    USING updated_at AT TIME ZONE 'UTC';
-                END IF;
-
-                -- 迁移 blog_posts.date, created_at 和 updated_at
-                IF EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'blog_posts'
-                    AND column_name = 'date'
-                    AND data_type = 'timestamp without time zone'
-                ) THEN
-                    ALTER TABLE blog_posts
-                    ALTER COLUMN date TYPE TIMESTAMP WITH TIME ZONE
-                    USING date AT TIME ZONE 'UTC',
-                    ALTER COLUMN created_at TYPE TIMESTAMP WITH TIME ZONE
-                    USING created_at AT TIME ZONE 'UTC',
-                    ALTER COLUMN updated_at TYPE TIMESTAMP WITH TIME ZONE
-                    USING updated_at AT TIME ZONE 'UTC';
-                END IF;
-            END $$;
-        """))
-        # 创建索引用于查询
-        await session.execute(text("""
-            CREATE INDEX IF NOT EXISTS idx_post_view_ips_lookup
-            ON post_view_ips (post_id, ip, viewed_at)
-        """))
-        await session.commit()
-
     yield
-    # 这里可以添加应用关闭时的清理逻辑
 
 
 # ========== 认证依赖函数 ==========
