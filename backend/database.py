@@ -8,17 +8,19 @@
 4. 提供数据库初始化函数
 
 技术栈：
-- SQLAlchemy Core + AsyncIO
+- SQLAlchemy 2.0 Core + AsyncIO
 - asyncpg: PostgreSQL 异步驱动
 """
 
 # 标准库导入
 import os
+from typing import List
 
 # 第三方库导入
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from sqlalchemy.dialects import postgresql
 
 # 加载环境变量
 load_dotenv()
@@ -28,19 +30,29 @@ load_dotenv()
 # 数据库连接 URL
 # 优先级：环境变量 DATABASE_URL > 默认值
 DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/blog_ai"
+    "DATABASE_URL", "postgresql+asyncpg://postgres:CHANGE_THIS_PASSWORD@localhost:5432/blog_ai"
 )
 
 # 创建异步数据库引擎
-# echo=True: 启用 SQL 日志（开发环境使用）
-engine = create_async_engine(DATABASE_URL, echo=True)
+# echo: 从环境变量读取，默认关闭 SQL 日志（生产环境）
+DB_ECHO = os.getenv("DB_ECHO", "false").lower() == "true"
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=DB_ECHO,
+    pool_size=int(os.getenv("DB_POOL_SIZE", "5")),
+    max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "10"))
+)
 
 # 创建异步会话工厂
 # expire_on_commit=False: 提交后不立即过期对象，提高性能
 async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-# declarative_base: 用于创建 ORM 模型基类
-Base = declarative_base()
+# DeclarativeBase: SQLAlchemy 2.0 推荐的 ORM 模型基类
+# 配置类型映射：Python list[str] 映射到 PostgreSQL JSON 类型
+class Base(DeclarativeBase):
+    type_annotation_map = {
+        List[str]: postgresql.JSON,
+    }
 
 
 # ========== 依赖注入 ==========
@@ -55,6 +67,10 @@ async def get_db():
     2. 尝试执行业务逻辑
     3. 无论成功或失败，确保会话正确关闭
 
+    注意：
+    - CRUD 函数中需要显式调用 await db.commit() 来提交事务
+    - 异常时需要调用 await db.rollback() 来回滚事务
+
     Yields:
         AsyncSession: 数据库会话实例
 
@@ -66,10 +82,8 @@ async def get_db():
     """
     async with async_session() as session:
         try:
-            # 成功时自动提交
             yield session
         finally:
-            # 无论成功失败，都关闭会话
             await session.close()
 
 
@@ -81,7 +95,7 @@ async def init_db():
     初始化数据库表结构
 
     在应用启动时调用，创建所有定义的数据库表。
-    使用 SQLAlchemy 的 run_sync 方法同步执行 DDL。
+    使用 SQLAlchemy 2.0 的 run_sync 方法同步执行 DDL。
     """
     # 导入模型，确保 metadata 包含所有表定义
     from models import BlogPost, User, Comment

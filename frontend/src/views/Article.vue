@@ -50,7 +50,7 @@
                 <h1 class="article-title">{{ post.title }}</h1>
                 <div class="article-meta">
                   <!-- 标签列表 -->
-                  <n-tag v-for="tag in post.tags" :key="tag" size="small" round>
+                  <n-tag v-for="tag in (post.tags || [])" :key="tag" size="small" round>
                     {{ tag }}
                   </n-tag>
                   <!-- 阅读量 -->
@@ -65,20 +65,12 @@
             </HandDrawnCard>
 
             <!-- 评论区域 -->
-            <CommentSection
-              :post-id="postId"
-              :comments="comments"
-              @refresh="fetchComments"
-            />
+            <CommentSection :post-id="postId" :comments="comments" @refresh="fetchComments" />
           </div>
 
           <!-- 右侧：目录 -->
           <aside class="article-sidebar">
-            <TableOfContents
-              :headings="headings"
-              :active-id="activeHeadingId"
-              @select="scrollToHeading"
-            />
+            <TableOfContents :headings="headings" :active-id="activeHeadingId" @select="scrollToHeading" />
           </aside>
         </div>
       </template>
@@ -124,6 +116,12 @@ import CommentSection from '@/components/CommentSection.vue'
 
 // 导入目录组件
 import TableOfContents from '@/components/TableOfContents.vue'
+
+// ========== 组件配置 ==========
+
+defineOptions({
+  name: 'ArticlePage'
+})
 
 // ========== 组合式函数 ==========
 
@@ -343,7 +341,7 @@ const setupCopyButtons = () => {
           btn.classList.remove('copied')
           btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>'
         }, 2000)
-      } catch (e) {
+      } catch {
         message.error('复制失败')
       }
     }

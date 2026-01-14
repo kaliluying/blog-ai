@@ -6,9 +6,10 @@ Pydantic 数据验证模式（Schemas）模块
 - 响应模式：API 返回给前端的数据结构
 
 技术要点：
-- 继承 Pydantic 的 BaseModel
+- 使用 Pydantic v2 的 BaseModel
 - 支持数据验证、类型检查
 - 支持可选字段和默认值
+- 使用 model_config 替代 Config 类
 
 类说明：
 - BlogPostBase: 基础模式，包含所有文章共有字段
@@ -22,8 +23,9 @@ Pydantic 数据验证模式（Schemas）模块
 from datetime import datetime
 
 # 第三方库导入
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
 from typing import List, Optional
+import re
 
 
 # ========== 用户相关模式 ==========
@@ -32,14 +34,24 @@ from typing import List, Optional
 class UserBase(BaseModel):
     """用户基础模式"""
 
-    username: str
+    username: str = Field(..., min_length=3, max_length=50, pattern=r'^[a-zA-Z0-9_-]+$')
     email: EmailStr
 
 
 class UserCreate(UserBase):
     """创建用户请求模式"""
 
-    password: str
+    password: str = Field(..., min_length=8, max_length=128)
+
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        """验证密码复杂度"""
+        if not re.search(r'[A-Za-z]', v):
+            raise ValueError('密码必须包含至少一个字母')
+        if not re.search(r'\d', v):
+            raise ValueError('密码必须包含至少一个数字')
+        return v
 
 
 class UserLogin(BaseModel):
@@ -57,8 +69,12 @@ class UserResponse(UserBase):
     is_admin: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+    @classmethod
+    def from_orm(cls, obj) -> "UserResponse":
+        """从 ORM 对象创建 Pydantic 模型"""
+        return cls.model_validate(obj)
 
 
 class Token(BaseModel):
@@ -80,87 +96,76 @@ class TokenData(BaseModel):
 
 
 class BlogPostBase(BaseModel):
-    """
-    博客文章基础模式
+    """博客文章基础模式"""
 
-    包含文章的核心字段，作为其他模式的基类。
-    """
-
-    title: str  # 文章标题
-    excerpt: str  # 文章摘要
-    content: str  # 文章内容
+    title: str = Field(..., min_length=1, max_length=255)
+    excerpt: str = Field(..., min_length=1, max_length=500)
+    content: str = Field(..., min_length=1)
 
 
 class BlogPostCreate(BlogPostBase):
-    """
-    创建文章请求模式
+    """创建文章请求模式"""
 
-    继承基础字段，添加创建时特有的字段。
-    """
-
-    tags: List[str] = []  # 标签列表，默认空列表
+    tags: List[str] = []
 
 
 class BlogPostUpdate(BlogPostBase):
-    """
-    更新文章请求模式
+    """更新文章请求模式"""
 
-    所有字段都是可选的，支持部分更新。
-    """
+    title: Optional[str] = None
+    excerpt: Optional[str] = None
+    content: Optional[str] = None
+    tags: Optional[List[str]] = None
 
-    title: Optional[str] = None  # 可选更新
-    excerpt: Optional[str] = None  # 可选更新
-    content: Optional[str] = None  # 可选更新
-    tags: Optional[List[str]] = None  # 可选更新
+
+class TitleCheckRequest(BaseModel):
+    """标题唯一性检查请求模式"""
+
+    title: str = Field(..., min_length=1, max_length=255)
+    exclude_id: Optional[int] = None
+
+
+class TitleCheckResponse(BaseModel):
+    """标题唯一性检查响应模式"""
+
+    exists: bool
+    message: str
 
 
 class BlogPostResponse(BlogPostBase):
-    """
-    文章详情响应模式
+    """文章详情响应模式"""
 
-    用于 API 返回完整文章信息。
-    """
+    id: int
+    date: datetime
+    created_at: datetime
+    updated_at: datetime
+    tags: List[str] = []
+    view_count: int = 0
 
-    id: int  # 文章 ID
-    date: datetime  # 发布日期
-    created_at: datetime  # 创建时间
-    updated_at: datetime  # 更新时间
-    tags: List[str] = []  # 标签列表
-    view_count: int = 0  # 阅读量
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        """
-        Pydantic 配置
-
-        from_attributes: 允许从 ORM 模型创建 Pydantic 模型
-        """
-
-        from_attributes = True
+    @classmethod
+    def from_orm(cls, obj) -> "BlogPostResponse":
+        """从 ORM 对象创建 Pydantic 模型"""
+        return cls.model_validate(obj)
 
 
-# 用于列表返回的简化响应模式
 class BlogPostListItem(BaseModel):
-    """
-    文章列表项响应模式
+    """文章列表项响应模式"""
 
-    用于文章列表页的简化展示。
-    """
+    id: int
+    title: str
+    excerpt: str
+    date: datetime
+    tags: List[str] = []
+    view_count: int = 0
 
-    id: int  # 文章 ID
-    title: str  # 标题
-    excerpt: str  # 摘要
-    date: datetime  # 发布日期
-    tags: List[str] = []  # 标签
-    view_count: int = 0  # 阅读量
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        """
-        Pydantic 配置
-
-        from_attributes: 允许从 ORM 模型创建 Pydantic 模型
-        """
-
-        from_attributes = True
+    @classmethod
+    def from_orm(cls, obj) -> "BlogPostListItem":
+        """从 ORM 对象创建 Pydantic 模型"""
+        return cls.model_validate(obj)
 
 
 # ========== 评论相关模式 ==========
@@ -169,14 +174,14 @@ class BlogPostListItem(BaseModel):
 class CommentBase(BaseModel):
     """评论基础模式"""
 
-    content: str
+    content: str = Field(..., min_length=1, max_length=2000)
 
 
 class CommentCreate(CommentBase):
     """创建评论请求模式"""
 
     post_id: int
-    parent_id: Optional[int] = None  # 回复的评论 ID
+    parent_id: Optional[int] = None
 
 
 class CommentResponse(CommentBase):
@@ -185,13 +190,17 @@ class CommentResponse(CommentBase):
     id: int
     post_id: int
     user_id: int
-    username: str  # 评论者用户名
+    username: str
     parent_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+    @classmethod
+    def from_orm(cls, obj) -> "CommentResponse":
+        """从 ORM 对象创建 Pydantic 模型"""
+        return cls.model_validate(obj)
 
 
 class CommentWithReplies(CommentResponse):
@@ -211,40 +220,46 @@ class SearchResult(BaseModel):
     excerpt: str
     date: datetime
     tags: List[str] = []
-    score: Optional[float] = None  # 搜索相关性得分
+    score: Optional[float] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+    @classmethod
+    def from_orm(cls, obj) -> "SearchResult":
+        """从 ORM 对象创建 Pydantic 模型"""
+        return cls.model_validate(obj)
 
 
 # ========== 归档相关模式 ==========
 
 
 class ArchiveGroup(BaseModel):
-    """归档分组模式
+    """归档分组模式"""
 
-    按年月分组的文章归档
-    """
+    year: int
+    month: int
+    month_name: str
+    post_count: int
+    posts: List[BlogPostListItem] = []
 
-    year: int  # 年份
-    month: int  # 月份 (1-12)
-    month_name: str  # 月份名称 (如 "一月")
-    post_count: int  # 该月的文章数量
-    posts: List[BlogPostListItem] = []  # 该月的文章列表
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        from_attributes = True
+    @classmethod
+    def from_orm(cls, obj) -> "ArchiveGroup":
+        """从 ORM 对象创建 Pydantic 模型"""
+        return cls.model_validate(obj)
 
 
 class ArchiveYear(BaseModel):
-    """年度归档模式
+    """年度归档模式"""
 
-    按年份分组的归档
-    """
+    year: int
+    post_count: int
+    months: List[ArchiveGroup] = []
 
-    year: int  # 年份
-    post_count: int  # 该年的文章数量
-    months: List[ArchiveGroup] = []  # 该年的月份归档列表
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        from_attributes = True
+    @classmethod
+    def from_orm(cls, obj) -> "ArchiveYear":
+        """从 ORM 对象创建 Pydantic 模型"""
+        return cls.model_validate(obj)

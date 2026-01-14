@@ -23,12 +23,7 @@
           <h1 class="admin-title">文章管理</h1>
           <div class="header-actions">
             <!-- 搜索框 -->
-            <n-input
-              v-model:value="searchKeyword"
-              placeholder="搜索文章..."
-              clearable
-              style="width: 200px"
-            >
+            <n-input v-model:value="searchKeyword" placeholder="搜索文章..." clearable style="width: 200px">
               <template #prefix>
                 <HandDrawnIcon type="star" :size="16" />
               </template>
@@ -54,13 +49,8 @@
         </div>
 
         <!-- 文章表格 -->
-        <n-data-table
-          v-else
-          :columns="columns"
-          :data="filteredPosts"
-          :bordered="false"
-          :row-key="(row: BlogPost) => row.id"
-        />
+        <n-data-table v-else :columns="columns" :data="filteredPosts" :bordered="false"
+          :row-key="(row: BlogPost) => row.id" />
 
         <!-- 搜索无结果状态 -->
         <div v-if="filteredPosts.length === 0 && posts.length > 0" class="empty-state">
@@ -133,14 +123,15 @@ const filteredPosts = computed(() => {
   const keyword = searchKeyword.value.toLowerCase()
 
   // 过滤文章
-  return posts.value.filter(post =>
+  return posts.value.filter(post => {
+    const tags = post.tags || []
     // 匹配标题
-    post.title.toLowerCase().includes(keyword) ||
-    // 匹配摘要
-    post.excerpt.toLowerCase().includes(keyword) ||
-    // 匹配标签
-    post.tags.some(tag => tag.toLowerCase().includes(keyword))
-  )
+    return post.title.toLowerCase().includes(keyword) ||
+      // 匹配摘要
+      post.excerpt.toLowerCase().includes(keyword) ||
+      // 匹配标签
+      tags.some(tag => tag.toLowerCase().includes(keyword))
+  })
 })
 
 // ========== 方法 ==========
@@ -151,12 +142,10 @@ const filteredPosts = computed(() => {
  */
 const handleDelete = async (id: number) => {
   try {
-    // 调用 API 删除文章
     await blogApi.deletePost(id)
     message.success('删除成功')
-    // 重新获取文章列表
     blogStore.fetchPosts()
-  } catch (e) {
+  } catch {
     message.error('删除失败')
   }
 }
@@ -184,7 +173,7 @@ const createColumns = (): DataTableColumns<BlogPost> => [
   {
     title: '标签',
     key: 'tags',
-    render: (row) => h(NSpace, () => row.tags.map((tag: string) => h(NTag, { size: 'small', round: true }, () => tag)))
+    render: (row) => h(NSpace, () => (row.tags || []).map((tag: string) => h(NTag, { size: 'small', round: true }, () => tag)))
   },
   // 日期列（格式化显示）
   {

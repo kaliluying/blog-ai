@@ -41,22 +41,24 @@
           <!-- 标题输入 -->
           <div class="form-row">
             <span class="form-label">标题</span>
-            <n-input
-              v-model:value="formData.title"
-              placeholder="请输入文章标题"
-              size="large"
-            />
+            <n-input v-model:value="formData.title" placeholder="请输入文章标题" size="large"
+              :status="titleValidation.exists ? 'error' : undefined" />
+            <!-- 标题验证提示 -->
+            <div v-if="titleValidation.checking" class="title-validation checking">
+              <n-spin size="small" /> 正在检查标题...
+            </div>
+            <div v-else-if="titleValidation.exists" class="title-validation error">
+              ⚠️ {{ titleValidation.message }}
+            </div>
+            <div v-else-if="titleValidation.message && !titleValidation.checking" class="title-validation success">
+              ✓ {{ titleValidation.message }}
+            </div>
           </div>
 
           <!-- 摘要输入 -->
           <div class="form-row">
             <span class="form-label">摘要</span>
-            <n-input
-              v-model:value="formData.excerpt"
-              type="textarea"
-              placeholder="请输入文章摘要"
-              :rows="2"
-            />
+            <n-input v-model:value="formData.excerpt" type="textarea" placeholder="请输入文章摘要" :rows="2" />
           </div>
 
           <!-- 标签输入 -->
@@ -71,31 +73,20 @@
             <div class="editor-container">
               <!-- 编辑器标签页 -->
               <div class="editor-tabs">
-                <n-button
-                  :type="editorMode === 'edit' ? 'primary' : 'default'"
-                  @click="editorMode = 'edit'"
-                  size="small"
-                >
+                <n-button :type="editorMode === 'edit' ? 'primary' : 'default'" @click="editorMode = 'edit'"
+                  size="small">
                   编辑
                 </n-button>
-                <n-button
-                  :type="editorMode === 'preview' ? 'primary' : 'default'"
-                  @click="editorMode = 'preview'"
-                  size="small"
-                >
+                <n-button :type="editorMode === 'preview' ? 'primary' : 'default'" @click="editorMode = 'preview'"
+                  size="small">
                   预览
                 </n-button>
               </div>
 
               <!-- 编辑模式：Markdown 输入框 -->
-              <n-input
-                v-if="editorMode === 'edit'"
-                v-model:value="formData.content"
-                type="textarea"
+              <n-input v-if="editorMode === 'edit'" v-model:value="formData.content" type="textarea"
                 placeholder="支持 Markdown 语法&#10;&#10;**粗体** *斜体* ~~删除线~~&#10;# 一级标题&#10;## 二级标题&#10;- 列表项&#10;> 引用&#10;`代码`&#10;```代码块```"
-                :rows="16"
-                class="markdown-editor"
-              />
+                :rows="16" class="markdown-editor" />
 
               <!-- 预览模式：渲染后的 HTML -->
               <div v-else class="markdown-preview" v-html="renderedContent"></div>
@@ -118,7 +109,7 @@
 
 <script setup lang="ts">
 // 从 vue 导入 Composition API 工具
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 
 // 从 vue-router 导入路由功能
 import { useRouter, useRoute } from 'vue-router'
@@ -132,8 +123,17 @@ import HandDrawnDivider from '@/components/HandDrawnDivider.vue'
 import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
 
 // 导入 API 和工具函数
-import { blogApi } from '@/api'
+import { blogApi, type BlogPostCreate, type BlogPostUpdate } from '@/api'
 import { renderMarkdownSafe } from '@/utils/markdown'
+
+// ========== 类型定义 ==========
+
+type FormData = BlogPostCreate
+
+interface TitleCheckResponse {
+  exists: boolean
+  message: string
+}
 
 // ========== 组合式函数 ==========
 
@@ -167,12 +167,26 @@ const submitting = ref(false)
 const editorMode = ref<'edit' | 'preview'>('edit')
 
 // 表单数据
-const formData = ref({
-  title: '',       // 文章标题
-  excerpt: '',     // 文章摘要
-  content: '',     // 文章内容（Markdown）
-  tags: [] as string[]  // 文章标签
+const formData = ref<FormData>({
+  title: '',
+  excerpt: '',
+  content: '',
+  tags: []
 })
+
+// 标题验证状态
+const titleValidation = ref<{
+  checking: boolean
+  exists: boolean
+  message: string
+}>({
+  checking: false,
+  exists: false,
+  message: ''
+})
+
+// 防抖定时器
+let titleCheckTimer: ReturnType<typeof setTimeout> | null = null
 
 // ========== 计算属性 ==========
 
@@ -203,6 +217,12 @@ const fetchPost = async () => {
       content: post.content,
       tags: post.tags || []
     }
+    // 重置标题验证状态
+    titleValidation.value = {
+      checking: false,
+      exists: false,
+      message: ''
+    }
   } catch (e) {
     message.error('获取文章失败')
     console.error(e)
@@ -213,10 +233,82 @@ const fetchPost = async () => {
 }
 
 /**
+ * 检查标题是否重复
+ * 使用防抖避免频繁请求
+ */
+const checkTitleDuplicate = async () => {
+  const title = formData.value.title.trim()
+
+  // 如果标题为空，重置验证状态
+  if (!title) {
+    titleValidation.value = {
+      checking: false,
+      exists: false,
+      message: ''
+    }
+    return
+  }
+
+  // 设置检查中状态
+  titleValidation.value.checking = true
+
+  try {
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+    const response = await fetch(`${apiBaseUrl}/api/posts/check-title`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+      },
+      body: JSON.stringify({
+        title,
+        exclude_id: postId.value
+      })
+    })
+
+    if (response.ok) {
+      const data: TitleCheckResponse = await response.json()
+      titleValidation.value = {
+        checking: false,
+        exists: data.exists,
+        message: data.message
+      }
+    } else if (response.status === 401) {
+      // 未授权 - 可能是 token 过期
+      titleValidation.value = {
+        checking: false,
+        exists: false,
+        message: ''
+      }
+    } else {
+      // 其他错误，不阻断用户操作
+      titleValidation.value = {
+        checking: false,
+        exists: false,
+        message: ''
+      }
+    }
+  } catch {
+    // 网络错误时忽略，不阻断用户操作
+    titleValidation.value = {
+      checking: false,
+      exists: false,
+      message: ''
+    }
+  }
+}
+
+/**
  * 处理表单提交
  * 验证表单数据并调用 API 创建或更新文章
  */
 const handleSubmit = async () => {
+  // 检查标题是否存在
+  if (titleValidation.value.exists) {
+    message.warning('标题已存在，请使用其他标题')
+    return
+  }
+
   // 表单验证
   if (!formData.value.title || !formData.value.excerpt || !formData.value.content) {
     message.warning('请填写完整信息')
@@ -234,15 +326,12 @@ const handleSubmit = async () => {
 
   try {
     if (isEditMode.value) {
-      // 更新文章
-      await blogApi.updatePost(postId.value!, formData.value)
+      await blogApi.updatePost(postId.value!, formData.value as BlogPostUpdate)
       message.success('文章更新成功')
     } else {
-      // 创建文章
       await blogApi.createPost(formData.value)
       message.success('文章发布成功')
     }
-    // 跳转到文章列表页
     router.push('/admin/posts')
   } catch (e) {
     message.error(isEditMode.value ? '更新失败' : '发布失败')
@@ -251,6 +340,23 @@ const handleSubmit = async () => {
     submitting.value = false
   }
 }
+
+// ========== 监听器 ==========
+
+/**
+ * 监听标题变化，使用防抖检查重复
+ */
+watch(() => formData.value.title, () => {
+  // 清除之前的定时器
+  if (titleCheckTimer) {
+    clearTimeout(titleCheckTimer)
+  }
+
+  // 设置新的防抖定时器（500ms 后检查）
+  titleCheckTimer = setTimeout(() => {
+    checkTitleDuplicate()
+  }, 500)
+})
 
 // ========== 生命周期 ==========
 
@@ -408,5 +514,25 @@ onMounted(() => {
   margin-top: 32px;
   padding-top: 24px;
   border-top: 1px solid #eee;
+}
+
+.title-validation {
+  margin-top: 8px;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  &.checking {
+    color: #7f8c8d;
+  }
+
+  &.error {
+    color: #e74c3c;
+  }
+
+  &.success {
+    color: #27ae60;
+  }
 }
 </style>

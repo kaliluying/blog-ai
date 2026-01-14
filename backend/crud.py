@@ -11,16 +11,10 @@
 技术要点：
 - 使用 SQLAlchemy 异步 API
 - 支持分页查询（skip/limit）
-- 辅助函数处理 JSON 和时间戳
-
-辅助函数：
-- utc_now: 获取当前 UTC 时间
-- tags_to_json: 将标签列表转为 JSON 字符串
-- tags_from_json: 将 JSON 字符串转为标签列表
+- tags 字段使用 JSON 类型，无需手动序列化
 """
 
 # 标准库导入
-import json
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
@@ -32,39 +26,6 @@ from sqlalchemy import select, or_, text
 from models import BlogPost, User, Comment
 from schemas import BlogPostCreate, BlogPostUpdate
 from utils.time import utc_now
-
-
-# ========== 辅助函数 ==========
-
-
-def tags_to_json(tags: List[str]) -> str:
-    """
-    将标签列表转换为 JSON 字符串
-
-    Args:
-        tags: 标签字符串列表
-
-    Returns:
-        str: JSON 格式的字符串
-    """
-    return json.dumps(tags, ensure_ascii=False)
-
-
-def tags_from_json(json_str: str) -> List[str]:
-    """
-    将 JSON 字符串转换为标签列表
-
-    Args:
-        json_str: JSON 格式的字符串
-
-    Returns:
-        List[str]: 标签字符串列表
-    """
-    try:
-        return json.loads(json_str) if json_str else []
-    except (json.JSONDecodeError, TypeError):
-        # 解析失败时返回空列表
-        return []
 
 
 # ========== 用户相关 CRUD ==========
@@ -154,6 +115,32 @@ async def get_post_by_id(db: AsyncSession, post_id: int) -> Optional[BlogPost]:
     return result.scalar_one_or_none()
 
 
+async def check_post_title_exists(
+    db: AsyncSession,
+    title: str,
+    exclude_id: Optional[int] = None
+) -> bool:
+    """
+    检查文章标题是否已存在
+
+    用于创建或更新文章时验证标题唯一性。
+
+    Args:
+        db: 数据库会话
+        title: 要检查的标题
+        exclude_id: 排除的文章 ID（更新时使用）
+
+    Returns:
+        bool: 标题已存在返回 True，不存在返回 False
+    """
+    query = select(BlogPost).where(BlogPost.title == title)
+    if exclude_id is not None:
+        query = query.where(BlogPost.id != exclude_id)
+    query = query.limit(1)  # 限制只返回一条记录
+    result = await db.execute(query)
+    return result.scalar_one_or_none() is not None
+
+
 async def create_post(
     db: AsyncSession, post: BlogPostCreate, tags: List[str] = None
 ) -> BlogPost:
@@ -168,15 +155,12 @@ async def create_post(
     Returns:
         BlogPost: 创建的文章 ORM 模型
     """
-    # 处理标签列表
-    tags_json = tags_to_json(tags or [])
-
     # 创建 ORM 模型实例
     db_post = BlogPost(
         title=post.title,
         excerpt=post.excerpt,
         content=post.content,
-        tags=tags_json,
+        tags=tags or [],
         date=utc_now(),
     )
 
@@ -222,7 +206,7 @@ async def update_post(
 
     # 单独处理 tags 字段（如果提供）
     if tags is not None:
-        db_post.tags = tags_to_json(tags)
+        db_post.tags = tags
 
     # 提交事务
     await db.commit()
@@ -418,7 +402,7 @@ async def get_archive_by_year(db: AsyncSession, year: int) -> List[BlogPost]:
 
 
 def get_utc_now():
-    """获取当前 UTC 时间（带时区信息）"""
+    """获取当前 UTC 时间（timezone-aware）"""
     return datetime.now(timezone.utc)
 
 

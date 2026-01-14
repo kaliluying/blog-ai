@@ -50,6 +50,8 @@ from schemas import (
     SearchResult,
     ArchiveGroup,
     ArchiveYear,
+    TitleCheckRequest,
+    TitleCheckResponse,
 )
 from crud import (
     get_posts,
@@ -72,6 +74,7 @@ from crud import (
     record_post_view,
     get_popular_posts,
     get_post_view_count,
+    check_post_title_exists,
 )
 from auth import (
     verify_password,
@@ -100,9 +103,68 @@ async def lifespan(app: FastAPI):
                 id SERIAL PRIMARY KEY,
                 post_id INTEGER NOT NULL,
                 ip VARCHAR(45) NOT NULL,
-                viewed_at TIMESTAMP NOT NULL,
+                viewed_at TIMESTAMP WITH TIME ZONE NOT NULL,
                 UNIQUE(post_id, ip)
             )
+        """))
+        # 迁移现有表到 TIMESTAMP WITH TIME ZONE
+        await session.execute(text("""
+            DO $$
+            BEGIN
+                -- 迁移 post_view_ips.viewed_at
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'post_view_ips'
+                    AND column_name = 'viewed_at'
+                    AND data_type = 'timestamp without time zone'
+                ) THEN
+                    ALTER TABLE post_view_ips
+                    ALTER COLUMN viewed_at TYPE TIMESTAMP WITH TIME ZONE
+                    USING viewed_at AT TIME ZONE 'UTC';
+                END IF;
+
+                -- 迁移 users.created_at
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'users'
+                    AND column_name = 'created_at'
+                    AND data_type = 'timestamp without time zone'
+                ) THEN
+                    ALTER TABLE users
+                    ALTER COLUMN created_at TYPE TIMESTAMP WITH TIME ZONE
+                    USING created_at AT TIME ZONE 'UTC';
+                END IF;
+
+                -- 迁移 comments.created_at 和 updated_at
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'comments'
+                    AND column_name = 'created_at'
+                    AND data_type = 'timestamp without time zone'
+                ) THEN
+                    ALTER TABLE comments
+                    ALTER COLUMN created_at TYPE TIMESTAMP WITH TIME ZONE
+                    USING created_at AT TIME ZONE 'UTC',
+                    ALTER COLUMN updated_at TYPE TIMESTAMP WITH TIME ZONE
+                    USING updated_at AT TIME ZONE 'UTC';
+                END IF;
+
+                -- 迁移 blog_posts.date, created_at 和 updated_at
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'blog_posts'
+                    AND column_name = 'date'
+                    AND data_type = 'timestamp without time zone'
+                ) THEN
+                    ALTER TABLE blog_posts
+                    ALTER COLUMN date TYPE TIMESTAMP WITH TIME ZONE
+                    USING date AT TIME ZONE 'UTC',
+                    ALTER COLUMN created_at TYPE TIMESTAMP WITH TIME ZONE
+                    USING created_at AT TIME ZONE 'UTC',
+                    ALTER COLUMN updated_at TYPE TIMESTAMP WITH TIME ZONE
+                    USING updated_at AT TIME ZONE 'UTC';
+                END IF;
+            END $$;
         """))
         # 创建索引用于查询
         await session.execute(text("""
@@ -193,14 +255,18 @@ app = FastAPI(
 # ========== 中间件配置 ==========
 
 # CORS（跨域资源共享）中间件配置
-# 允许前端开发服务器访问 API
+# 从环境变量读取允许的源，多个源用逗号分隔
+CORS_ORIGINS = os.getenv(
+    "CORS_ORIGINS", 
+    "http://localhost:5173,http://127.0.0.1:5173"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    # 允许的来源列表（前端开发服务器地址）
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_credentials=True,  # 允许携带凭证（cookies）
-    allow_methods=["*"],  # 允许所有 HTTP 方法
-    allow_headers=["*"],  # 允许所有请求头
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -226,6 +292,12 @@ MONTH_NAMES = {
 
 def post_to_dict(post: BlogPost) -> dict:
     """将 BlogPost ORM 模型转换为完整字典"""
+    tags = post.tags if post.tags else []
+    if isinstance(tags, str):
+        try:
+            tags = json.loads(tags)
+        except (json.JSONDecodeError, TypeError):
+            tags = []
     return {
         "id": post.id,
         "title": post.title,
@@ -234,19 +306,25 @@ def post_to_dict(post: BlogPost) -> dict:
         "date": post.date,
         "created_at": post.created_at,
         "updated_at": post.updated_at,
-        "tags": json.loads(post.tags) if post.tags else [],
+        "tags": tags if isinstance(tags, list) else [],
         "view_count": post.view_count,
     }
 
 
 def post_to_list_item(post: BlogPost) -> dict:
     """将 BlogPost ORM 模型转换为列表项"""
+    tags = post.tags if post.tags else []
+    if isinstance(tags, str):
+        try:
+            tags = json.loads(tags)
+        except (json.JSONDecodeError, TypeError):
+            tags = []
     return {
         "id": post.id,
         "title": post.title,
         "excerpt": post.excerpt,
         "date": post.date,
-        "tags": json.loads(post.tags) if post.tags else [],
+        "tags": tags if isinstance(tags, list) else [],
         "view_count": post.view_count,
     }
 
@@ -329,38 +407,26 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     Returns:
         Token: 访问令牌和用户信息
     """
-    # 检查用户名是否已存在
+    # 检查用户名或邮箱是否已存在
     existing_user = await get_user_by_username(db, user_data.username)
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="用户名已被注册"
-        )
-
-    # 检查邮箱是否已存在
     existing_email = await get_user_by_email(db, user_data.email)
-    if existing_email:
+    
+    if existing_user or existing_email:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="邮箱已被注册"
-        )
-
-    # 密码长度检查
-    if len(user_data.password) < 6:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="密码长度至少为6位"
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="该用户名或邮箱已被注册"
         )
 
     # 创建用户
     hashed_password = get_password_hash(user_data.password)
-    # 第一个注册的用户为管理员
-    user_count = await db.execute(text("SELECT COUNT(*) FROM users"))
-    is_admin = user_count.scalar() == 0
-
+    # 生产环境：第一个用户不再自动成为管理员
+    # 管理员需要通过数据库手动设置或使用专门的创建管理员接口
     db_user = await create_user(
         db,
         username=user_data.username,
         email=user_data.email,
         hashed_password=hashed_password,
-        is_admin=is_admin,
+        is_admin=False,
     )
 
     # 生成令牌
@@ -664,6 +730,47 @@ async def record_post_view_route(
     current_count = await get_post_view_count(db, post_id)
 
     return {"counted": counted, "view_count": current_count}
+
+
+@app.post("/api/posts/check-title")
+async def check_post_title(
+    request: TitleCheckRequest,
+    current_user: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    检查文章标题是否已存在
+
+    用于创建或编辑文章时的实时验证。
+
+    Request Body:
+        TitleCheckRequest: 包含 title 和可选的 exclude_id
+
+    Returns:
+        TitleCheckResponse: 标题是否存在及提示信息
+
+    Requires Admin Authentication
+    """
+    try:
+        exists = await check_post_title_exists(db, request.title, request.exclude_id)
+
+        if exists:
+            return TitleCheckResponse(
+                exists=True,
+                message=f"标题「{request.title}」已存在，请使用其他标题"
+            )
+        else:
+            return TitleCheckResponse(
+                exists=False,
+                message="标题可以使用"
+            )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return TitleCheckResponse(
+            exists=False,
+            message=f"检查失败: {str(e)}"
+        )
 
 
 @app.post("/api/posts", status_code=status.HTTP_201_CREATED)

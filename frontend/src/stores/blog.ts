@@ -40,6 +40,12 @@ export const useBlogStore = defineStore('blog', () => {
   const error = ref<string | null>(null)
 
   /**
+   * 原始错误对象
+   * 当请求失败时存储原始错误，用于调试和详细错误处理
+   */
+  const originalError = ref<Error | null>(null)
+
+  /**
    * 热门文章列表
    * 存储阅读量最高的文章
    */
@@ -54,18 +60,17 @@ export const useBlogStore = defineStore('blog', () => {
    * 包含完整的错误处理。
    */
   const fetchPosts = async () => {
-    loading.value = true   // 开始加载
-    error.value = null     // 清空错误
+    loading.value = true
+    error.value = null
+    originalError.value = null
 
     try {
-      // 调用 API 获取文章列表
       posts.value = await blogApi.getPosts()
     } catch (e) {
-      // 请求失败：设置错误信息
       error.value = '获取文章列表失败'
+      originalError.value = e instanceof Error ? e : new Error(String(e))
       console.error(e)
     } finally {
-      // 无论成功或失败，都结束加载状态
       loading.value = false
     }
   }
@@ -77,7 +82,7 @@ export const useBlogStore = defineStore('blog', () => {
    * @returns 找到的文章或 undefined
    */
   const getPostById = (id: number) => {
-    return posts.value.find(post => post.id === id)
+    return posts.value.find((post) => post.id === id)
   }
 
   /**
@@ -98,7 +103,7 @@ export const useBlogStore = defineStore('blog', () => {
       const post = await blogApi.getPost(id)
 
       // 如果文章不在缓存列表中，添加到列表
-      if (!posts.value.find(p => p.id === id)) {
+      if (!posts.value.find((p) => p.id === id)) {
         posts.value.push(post)
       }
 
@@ -140,7 +145,7 @@ export const useBlogStore = defineStore('blog', () => {
     try {
       const result: ViewCountResponse = await viewApi.recordView(postId)
       // 更新文章阅读量
-      const post = posts.value.find(p => p.id === postId)
+      const post = posts.value.find((p) => p.id === postId)
       if (post) {
         post.view_count = result.view_count
       }
@@ -161,7 +166,7 @@ export const useBlogStore = defineStore('blog', () => {
     try {
       const result: ViewCountResponse = await viewApi.recordView(postId)
       // 更新缓存中的阅读量
-      const post = posts.value.find(p => p.id === postId)
+      const post = posts.value.find((p) => p.id === postId)
       if (post) {
         post.view_count = result.view_count
       }
@@ -175,15 +180,16 @@ export const useBlogStore = defineStore('blog', () => {
   // ========== 返回暴露的接口 ==========
 
   return {
-    posts,           // 文章列表
-    loading,         // 加载状态
-    error,           // 错误信息
-    popularPosts,    // 热门文章
-    fetchPosts,      // 获取所有文章
-    getPostById,     // 查找文章（缓存）
-    fetchPostById,   // 获取单篇文章
-    fetchPopularPosts, // 获取热门文章
-    recordView,      // 记录文章浏览
-    updatePostViewCount // 获取并更新阅读量
+    posts,
+    loading,
+    error,
+    originalError,
+    popularPosts,
+    fetchPosts,
+    getPostById,
+    fetchPostById,
+    fetchPopularPosts,
+    recordView,
+    updatePostViewCount,
   }
 })

@@ -31,14 +31,9 @@
         </div>
 
         <div v-else class="posts-list">
-          <HandDrawnCard
-            v-for="post in filteredPosts"
-            :key="post.id"
-            :title="post.title"
-            class="post-card"
-          >
+          <HandDrawnCard v-for="post in filteredPosts" :key="post.id" :title="post.title" class="post-card">
             <div class="post-meta">
-              <n-tag v-for="t in post.tags" :key="t" size="small" round>
+              <n-tag v-for="t in (post.tags || [])" :key="t" size="small" round>
                 {{ t }}
               </n-tag>
               <span class="post-date">{{ formatDate(post.date) }}</span>
@@ -55,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { NSpin, NButton, NTag } from 'naive-ui'
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
@@ -74,9 +69,10 @@ const tag = computed(() => route.params.tag as string)
 
 const filteredPosts = computed(() => {
   if (!tag.value) return []
-  return allPosts.value.filter(post =>
-    post.tags.some(t => t.toLowerCase() === tag.value.toLowerCase())
-  )
+  return allPosts.value.filter(post => {
+    const tags = post.tags || []
+    return tags.some(t => t.toLowerCase() === tag.value.toLowerCase())
+  })
 })
 
 const readMore = (id: number) => {

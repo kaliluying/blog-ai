@@ -28,14 +28,9 @@
         </div>
 
         <div v-else-if="monthData" class="posts-list">
-          <HandDrawnCard
-            v-for="post in monthData.posts"
-            :key="post.id"
-            :title="post.title"
-            class="post-card"
-          >
+          <HandDrawnCard v-for="post in monthData.posts" :key="post.id" :title="post.title" class="post-card">
             <div class="post-meta">
-              <n-tag v-for="tag in post.tags" :key="tag" size="small" round>
+              <n-tag v-for="tag in (post.tags || [])" :key="tag" size="small" round>
                 {{ tag }}
               </n-tag>
               <span class="post-date">{{ formatDate(post.date) }}</span>
@@ -88,7 +83,7 @@ const fetchArchive = async () => {
 
   try {
     monthData.value = await archiveApi.getArchiveByYearMonth(year.value, month.value)
-  } catch (e: any) {
+  } catch (e: unknown) {
     error.value = '加载归档失败'
     console.error(e)
   } finally {

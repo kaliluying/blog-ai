@@ -28,8 +28,8 @@ const api = axios.create({
 
   // 默认请求头
   headers: {
-    'Content-Type': 'application/json'
-  }
+    'Content-Type': 'application/json',
+  },
 })
 
 /**
@@ -45,7 +45,7 @@ api.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error)
-  }
+  },
 )
 
 /**
@@ -67,7 +67,7 @@ api.interceptors.response.use(
     }
     console.error('API Error:', error)
     return Promise.reject(error)
-  }
+  },
 )
 
 // ========== 类型定义 ==========
@@ -77,15 +77,35 @@ api.interceptors.response.use(
  * 定义前后端交互的数据结构
  */
 export interface BlogPost {
-  id: number              // 文章唯一标识
-  title: string           // 文章标题
-  excerpt: string         // 文章摘要
-  content: string         // 文章内容（Markdown 格式）
-  date: string            // 发布日期
-  tags: string[]          // 标签数组
-  created_at?: string    // 创建时间（可选）
-  updated_at?: string    // 更新时间（可选）
-  view_count?: number    // 阅读量（可选）
+  id: number // 文章唯一标识
+  title: string // 文章标题
+  excerpt: string // 文章摘要
+  content: string // 文章内容（Markdown 格式）
+  date: string // 发布日期
+  tags: string[] // 标签数组
+  created_at: string // 创建时间
+  updated_at: string // 更新时间
+  view_count: number // 阅读量
+}
+
+/**
+ * 创建文章请求类型
+ */
+export interface BlogPostCreate {
+  title: string
+  excerpt: string
+  content: string
+  tags: string[]
+}
+
+/**
+ * 更新文章请求类型
+ */
+export interface BlogPostUpdate {
+  title?: string
+  excerpt?: string
+  content?: string
+  tags?: string[]
 }
 
 /**
@@ -169,7 +189,7 @@ export const blogApi = {
    * @param post 文章数据（不含 id 和 date，由后端生成）
    * @returns Promise<BlogPost> 创建后的文章（含 id）
    */
-  createPost: async (post: Omit<BlogPost, 'id' | 'date'>): Promise<BlogPost> => {
+  createPost: async (post: BlogPostCreate): Promise<BlogPost> => {
     return api.post('/api/posts', post)
   },
 
@@ -179,7 +199,7 @@ export const blogApi = {
    * @param post 要更新的字段（部分更新）
    * @returns Promise<BlogPost> 更新后的文章
    */
-  updatePost: async (id: number, post: Partial<BlogPost>): Promise<BlogPost> => {
+  updatePost: async (id: number, post: BlogPostUpdate): Promise<BlogPost> => {
     return api.put(`/api/posts/${id}`, post)
   },
 
@@ -199,7 +219,7 @@ export const blogApi = {
    */
   searchPosts: async (query: string): Promise<BlogPost[]> => {
     return api.get('/api/search', { params: { q: query } })
-  }
+  },
 }
 
 // ========== 认证 API ==========
@@ -228,17 +248,17 @@ export const authApi = {
     formData.append('username', username)
     formData.append('password', password)
     return api.post('/api/auth/login', formData, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     })
   },
 
   /**
-    * 获取当前用户信息
-    * @returns Promise<User> 当前用户信息
-    */
+   * 获取当前用户信息
+   * @returns Promise<User> 当前用户信息
+   */
   getMe: async (): Promise<User> => {
     return api.get('/api/auth/me')
-  }
+  },
 }
 
 // ========== 评论 API ==========
@@ -265,52 +285,52 @@ export const commentApi = {
   },
 
   /**
-    * 删除评论
-    * @param commentId 评论 ID
-    * @returns Promise<void>
-    */
-   deleteComment: async (commentId: number): Promise<void> => {
-     return api.delete(`/api/comments/${commentId}`)
-   }
- }
+   * 删除评论
+   * @param commentId 评论 ID
+   * @returns Promise<void>
+   */
+  deleteComment: async (commentId: number): Promise<void> => {
+    return api.delete(`/api/comments/${commentId}`)
+  },
+}
 
- // ========== 归档 API ==========
+// ========== 归档 API ==========
 
- export const archiveApi = {
-   /**
-    * 获取所有归档
-    * @returns Promise<ArchiveYear[]> 归档列表
-    */
-   getArchive: async (): Promise<ArchiveYear[]> => {
-     return api.get('/api/archive')
-   },
+export const archiveApi = {
+  /**
+   * 获取所有归档
+   * @returns Promise<ArchiveYear[]> 归档列表
+   */
+  getArchive: async (): Promise<ArchiveYear[]> => {
+    return api.get('/api/archive')
+  },
 
-   /**
-    * 获取指定年份的归档
-    * @param year 年份
-    * @returns Promise<ArchiveYear> 年度归档
-    */
-   getArchiveByYear: async (year: number): Promise<ArchiveYear> => {
-     return api.get(`/api/archive/${year}`)
-   },
+  /**
+   * 获取指定年份的归档
+   * @param year 年份
+   * @returns Promise<ArchiveYear> 年度归档
+   */
+  getArchiveByYear: async (year: number): Promise<ArchiveYear> => {
+    return api.get(`/api/archive/${year}`)
+  },
 
-   /**
-    * 获取指定年月的归档
-    * @param year 年份
-    * @param month 月份
-    * @returns Promise<ArchiveGroup> 月度归档
-    */
-   getArchiveByYearMonth: async (year: number, month: number): Promise<ArchiveGroup> => {
-     return api.get(`/api/archive/${year}/${month}`)
-   }
- }
+  /**
+   * 获取指定年月的归档
+   * @param year 年份
+   * @param month 月份
+   * @returns Promise<ArchiveGroup> 月度归档
+   */
+  getArchiveByYearMonth: async (year: number, month: number): Promise<ArchiveGroup> => {
+    return api.get(`/api/archive/${year}/${month}`)
+  },
+}
 
 /**
  * 阅读量响应类型
  */
 export interface ViewCountResponse {
-  counted: boolean  // 是否成功计数
-  view_count: number  // 当前阅读量
+  counted: boolean // 是否成功计数
+  view_count: number // 当前阅读量
 }
 
 // ========== 阅读量 API ==========
@@ -332,7 +352,7 @@ export const viewApi = {
    */
   getPopularPosts: async (limit: number = 5): Promise<BlogPost[]> => {
     return api.get('/api/posts/popular', { params: { limit } })
-  }
+  },
 }
 
 // 导出 Axios 实例（可自定义配置时使用）

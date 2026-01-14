@@ -12,19 +12,9 @@
 
     <!-- 评论表单 -->
     <div v-else-if="authStore.isLoggedIn" class="comment-form">
-      <n-input
-        v-model:value="newComment"
-        type="textarea"
-        placeholder="写下你的评论..."
-        :rows="3"
-      />
+      <n-input v-model:value="newComment" type="textarea" placeholder="写下你的评论..." :rows="3" />
       <div class="form-actions">
-        <n-button
-          type="primary"
-          :loading="submitting"
-          :disabled="!newComment.trim()"
-          @click="handleSubmit"
-        >
+        <n-button type="primary" :loading="submitting" :disabled="!newComment.trim()" @click="handleSubmit">
           发布评论
         </n-button>
       </div>
@@ -50,12 +40,8 @@
           <n-button text size="small" @click="showReplyForm(comment.id)">
             回复
           </n-button>
-          <n-popconfirm
-            v-if="canDelete(comment)"
-            positive-text="确认删除"
-            negative-text="取消"
-            @positive-click="handleDelete(comment.id)"
-          >
+          <n-popconfirm v-if="canDelete(comment)" positive-text="确认删除" negative-text="取消"
+            @positive-click="handleDelete(comment.id)">
             确定要删除这条评论吗？
             <template #trigger>
               <n-button text size="small" type="error">
@@ -67,21 +53,11 @@
 
         <!-- 回复表单 -->
         <div v-if="replyingTo === comment.id" class="reply-form">
-          <n-input
-            v-model:value="replyContent"
-            type="textarea"
-            placeholder="写下你的回复..."
-            :rows="2"
-          />
+          <n-input v-model:value="replyContent" type="textarea" placeholder="写下你的回复..." :rows="2" />
           <div class="form-actions">
             <n-button size="small" @click="cancelReply">取消</n-button>
-            <n-button
-              type="primary"
-              size="small"
-              :loading="submitting"
-              :disabled="!replyContent.trim()"
-              @click="handleReply(comment.id)"
-            >
+            <n-button type="primary" size="small" :loading="submitting" :disabled="!replyContent.trim()"
+              @click="handleReply(comment.id)">
               回复
             </n-button>
           </div>
@@ -99,12 +75,8 @@
               <n-button text size="small" @click="showReplyForm(reply.id, comment.id)">
                 回复
               </n-button>
-              <n-popconfirm
-                v-if="canDelete(reply)"
-                positive-text="确认删除"
-                negative-text="取消"
-                @positive-click="handleDelete(reply.id)"
-              >
+              <n-popconfirm v-if="canDelete(reply)" positive-text="确认删除" negative-text="取消"
+                @positive-click="handleDelete(reply.id)">
                 确定要删除这条评论吗？
                 <template #trigger>
                   <n-button text size="small" type="error">
@@ -116,21 +88,11 @@
 
             <!-- 二级回复表单 -->
             <div v-if="replyingTo === reply.id" class="reply-form">
-              <n-input
-                v-model:value="replyContent"
-                type="textarea"
-                placeholder="写下你的回复..."
-                :rows="2"
-              />
+              <n-input v-model:value="replyContent" type="textarea" placeholder="写下你的回复..." :rows="2" />
               <div class="form-actions">
                 <n-button size="small" @click="cancelReply">取消</n-button>
-                <n-button
-                  type="primary"
-                  size="small"
-                  :loading="submitting"
-                  :disabled="!replyContent.trim()"
-                  @click="handleReply(reply.id)"
-                >
+                <n-button type="primary" size="small" :loading="submitting" :disabled="!replyContent.trim()"
+                  @click="handleReply(reply.id)">
                   回复
                 </n-button>
               </div>
@@ -145,12 +107,8 @@
                 </div>
                 <div class="sub-reply-content">{{ subReply.content }}</div>
                 <div class="sub-reply-actions">
-                  <n-popconfirm
-                    v-if="canDelete(subReply)"
-                    positive-text="确认删除"
-                    negative-text="取消"
-                    @positive-click="handleDelete(subReply.id)"
-                  >
+                  <n-popconfirm v-if="canDelete(subReply)" positive-text="确认删除" negative-text="取消"
+                    @positive-click="handleDelete(subReply.id)">
                     确定要删除这条评论吗？
                     <template #trigger>
                       <n-button text size="small" type="error">
@@ -240,8 +198,9 @@ const handleSubmit = async () => {
     newComment.value = ''
     message.success('评论发布成功~')
     emit('refresh')
-  } catch (e: any) {
-    if (e.response?.status === 401) {
+  } catch (e: unknown) {
+    const error = e as { response?: { status?: number } }
+    if (error.response?.status === 401) {
       message.warning('请先登录')
       router.push('/login')
     } else {
@@ -268,8 +227,9 @@ const handleReply = async (parentId: number) => {
     replyingToParent.value = null
     message.success('回复发布成功~')
     emit('refresh')
-  } catch (e: any) {
-    if (e.response?.status === 401) {
+  } catch (e: unknown) {
+    const error = e as { response?: { status?: number } }
+    if (error.response?.status === 401) {
       message.warning('请先登录')
       router.push('/login')
     } else {
@@ -285,7 +245,7 @@ const handleDelete = async (commentId: number) => {
     await commentApi.deleteComment(commentId)
     message.success('评论已删除')
     emit('refresh')
-  } catch (error) {
+  } catch {
     message.error('删除失败，请稍后重试')
   }
 }

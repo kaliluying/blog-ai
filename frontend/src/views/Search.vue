@@ -18,7 +18,7 @@
             </router-link>
             <p class="result-excerpt">{{ post.excerpt }}</p>
             <div class="result-meta">
-              <n-tag v-for="tag in post.tags" :key="tag" size="small">
+              <n-tag v-for="tag in (post.tags || [])" :key="tag" size="small">
                 {{ tag }}
               </n-tag>
               <span class="result-date">{{ formatDate(post.date) }}</span>
@@ -45,6 +45,10 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { blogApi, type BlogPost } from '@/api'
+
+defineOptions({
+  name: 'SearchPage'
+})
 
 const route = useRoute()
 const router = useRouter()
@@ -152,6 +156,7 @@ watch(() => route.query.q, () => {
   margin-bottom: 12px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
