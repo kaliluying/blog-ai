@@ -17,26 +17,14 @@ SQLAlchemy ORM 数据模型定义模块
 """
 
 # 标准库导入
-from datetime import datetime, timezone
+from datetime import datetime
 
 # 第三方库导入
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean
 
 # 内部模块导入
 from database import Base
-
-
-def utc_now():
-    """
-    获取当前 UTC 时间
-
-    返回不带时区信息的 datetime 对象（naive datetime），
-    以确保与 PostgreSQL 的 timestamp 类型兼容。
-
-    Returns:
-        datetime: 当前 UTC 时间（无时区）
-    """
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+from utils.time import utc_now
 
 
 class User(Base):

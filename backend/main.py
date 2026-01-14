@@ -253,6 +253,39 @@ def comment_to_dict(comment: Comment, username: str = None) -> dict:
     }
 
 
+def group_posts_by_month(posts: List[BlogPost], year: int) -> List[ArchiveGroup]:
+    """将文章列表按月份分组"""
+    months_data: dict[int, list[dict]] = {}
+
+    for post in posts:
+        post_date = post.date if hasattr(post.date, "month") else post.date.month
+        month = (
+            post_date.month
+            if hasattr(post_date, "month")
+            else int(post_date.split("-")[1])
+        )
+
+        if month not in months_data:
+            months_data[month] = []
+        months_data[month].append(post_to_list_item(post))
+
+    months = []
+    for month, posts_list in months_data.items():
+        months.append(
+            ArchiveGroup(
+                year=year,
+                month=month,
+                month_name=MONTH_NAMES.get(month, str(month)),
+                post_count=len(posts_list),
+                posts=posts_list,
+            )
+        )
+
+    # 按月份降序排序
+    months.sort(key=lambda x: x.month, reverse=True)
+    return months
+
+
 # ========== API 路由 ==========
 
 
@@ -670,34 +703,7 @@ async def get_archive_list(db: AsyncSession = Depends(get_db)):
 
     for year in years:
         posts = await get_archive_by_year(db, year)
-        months_data = {}
-
-        for post in posts:
-            post_date = post.date if hasattr(post.date, "month") else post.date.month
-            month = (
-                post_date.month
-                if hasattr(post_date, "month")
-                else int(post_date.split("-")[1])
-            )
-
-            if month not in months_data:
-                months_data[month] = []
-            months_data[month].append(post_to_list_item(post))
-
-        months = []
-        for month, posts_list in months_data.items():
-            months.append(
-                ArchiveGroup(
-                    year=year,
-                    month=month,
-                    month_name=MONTH_NAMES.get(month, str(month)),
-                    post_count=len(posts_list),
-                    posts=posts_list,
-                )
-            )
-
-        # 按月份降序排序
-        months.sort(key=lambda x: x.month, reverse=True)
+        months = group_posts_by_month(posts, year)
         result.append(ArchiveYear(year=year, post_count=len(posts), months=months))
 
     return result
@@ -724,34 +730,7 @@ async def get_archive_by_year_route(
             status_code=status.HTTP_404_NOT_FOUND, detail="该年份没有文章"
         )
 
-    months_data = {}
-
-    for post in posts:
-        post_date = post.date if hasattr(post.date, "month") else post.date.month
-        month = (
-            post_date.month
-            if hasattr(post_date, "month")
-            else int(post_date.split("-")[1])
-        )
-
-        if month not in months_data:
-            months_data[month] = []
-        months_data[month].append(post_to_list_item(post))
-
-    months = []
-    for month, posts_list in months_data.items():
-        months.append(
-            ArchiveGroup(
-                year=year,
-                month=month,
-                month_name=MONTH_NAMES.get(month, str(month)),
-                post_count=len(posts_list),
-                posts=posts_list,
-            )
-        )
-
-    months.sort(key=lambda x: x.month, reverse=True)
-
+    months = group_posts_by_month(posts, year)
     return ArchiveYear(year=year, post_count=len(posts), months=months)
 
 

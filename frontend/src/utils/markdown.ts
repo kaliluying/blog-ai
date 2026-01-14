@@ -9,64 +9,90 @@
 import DOMPurify from 'dompurify'
 
 /**
+ * 链接安全处理函数
+ */
+const processLink = (_: string, text: string, url: string): string => {
+  // 移除危险协议
+  const normalizedUrl = url.replace(/^\s*(javascript|data|vbscript):/gi, '')
+  // 编码 URL 参数部分
+  const safeUrl = encodeURI(normalizedUrl)
+  // 仅允许 http/https 链接
+  const isSafeProtocol = /^https?:\/\//i.test(safeUrl) || !/^[a-z]+:/i.test(normalizedUrl)
+  const href = isSafeProtocol ? safeUrl : '#'
+  return `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`
+}
+
+/**
+ * 通用 Markdown 转换配置
+ * 包含除代码块外的所有转换规则
+ */
+const COMMON_TRANSFORMATIONS: Array<[RegExp, string | ((...args: string[]) => string)]> = [
+  // 行内代码
+  [/`([^`]+)`/g, '<code>$1</code>'],
+  // 粗体
+  [/\*\*([^*]+)\*\*/g, '<strong>$1</strong>'],
+  // 斜体
+  [/\*([^*]+)\*/g, '<em>$1</em>'],
+  // 删除线
+  [/~~([^~]+)~~/g, '<del>$1</del>'],
+  // 链接
+  [/\[([^\]]+)\]\(([^)]+)\)/g, processLink],
+  // 引用
+  [/^> (.+)$/gm, '<blockquote>$1</blockquote>'],
+  // 标题
+  [/^### (.+)$/gm, '<h3>$1</h3>'],
+  [/^## (.+)$/gm, '<h2>$1</h2>'],
+  [/^# (.+)$/gm, '<h1>$1</h1>'],
+  // 无序列表
+  [/^- (.+)$/gm, '<li>$1</li>'],
+  // 有序列表
+  [/^\d+\. (.+)$/gm, '<li>$1</li>'],
+  // 段落
+  [/\n\n/g, '</p><p>'],
+  // 换行
+  [/\n/g, '<br>']
+]
+
+/**
+ * 应用通用转换规则
+ */
+const applyCommonTransformations = (text: string, codeBlockHandler?: (match: string, lang: string, code: string) => string): string => {
+  let result = text
+
+  // 处理代码块（如果提供了处理器）
+  if (codeBlockHandler) {
+    result = result.replace(/```(\w*)\n([\s\S]*?)```/g, codeBlockHandler)
+  } else {
+    // 默认代码块处理
+    result = result.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+  }
+
+  // 应用通用转换
+  for (const [pattern, replacement] of COMMON_TRANSFORMATIONS) {
+    result = result.replace(pattern, replacement)
+  }
+
+  return result
+}
+
+/**
+ * 代码块处理器 - 带 base64 编码
+ */
+const codeBlockWithEncoding = (_: string, lang: string, code: string): string => {
+  const encodedCode = btoa(unescape(encodeURIComponent(code)))
+  return `<pre class="code-block" data-code="${encodedCode}"><code>${code}</code></pre>`
+}
+
+/**
  * 基础 Markdown 渲染函数
  * 将 Markdown 格式的文本转换为 HTML（不含代码块特殊处理）
- *
- * 支持的语法：
- * - 代码块（```code```）
- * - 行内代码（`code`）
- * - 粗体（**text**）
- * - 斜体（*text*）
- * - 删除线（~~text~~）
- * - 链接（[text](url)）
- * - 引用（> text）
- * - 标题（# ## ###）
- * - 列表（- 1.）
  *
  * @param text Markdown 原文
  * @returns 渲染后的 HTML 字符串
  */
 export const renderMarkdown = (text: string): string => {
   if (!text) return ''
-
-  let html = text
-    // 代码块
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-    // 行内代码
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    // 粗体
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    // 斜体
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-    // 删除线
-    .replace(/~~([^~]+)~~/g, '<del>$1</del>')
-    // 链接：验证 URL 是否安全，只允许 http/https 协议
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, url) => {
-      // 移除危险协议
-      const normalizedUrl = url.replace(/^\s*(javascript|data|vbscript):/gi, '')
-      // 编码 URL 参数部分
-      const safeUrl = encodeURI(normalizedUrl)
-      // 仅允许 http/https 链接
-      const isSafeProtocol = /^https?:\/\//i.test(safeUrl) || !/^[a-z]+:/i.test(normalizedUrl)
-      const href = isSafeProtocol ? safeUrl : '#'
-      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`
-    })
-    // 引用
-    .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
-    // 标题
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    // 无序列表
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    // 有序列表
-    .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
-    // 段落
-    .replace(/\n\n/g, '</p><p>')
-    // 换行
-    .replace(/\n/g, '<br>')
-
-  return `<p>${html}</p>`
+  return `<p>${applyCommonTransformations(text)}</p>`
 }
 
 /**
@@ -78,50 +104,7 @@ export const renderMarkdown = (text: string): string => {
  */
 export const renderMarkdownWithCode = (text: string): string => {
   if (!text) return ''
-
-  let html = text
-    // 代码块（添加特殊标记以便识别）
-    // 格式：```语言名 代码内容 ```
-    .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-      // 使用 btoa/atob 进行 base64 编码，以便在 data 属性中存储
-      const encodedCode = btoa(unescape(encodeURIComponent(code)))
-      return `<pre class="code-block" data-code="${encodedCode}"><code>${code}</code></pre>`
-    })
-    // 行内代码
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    // 粗体
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    // 斜体
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-    // 删除线
-    .replace(/~~([^~]+)~~/g, '<del>$1</del>')
-    // 链接：验证 URL 是否安全，只允许 http/https 协议
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, url) => {
-      // 移除危险协议
-      const normalizedUrl = url.replace(/^\s*(javascript|data|vbscript):/gi, '')
-      // 编码 URL 参数部分
-      const safeUrl = encodeURI(normalizedUrl)
-      // 仅允许 http/https 链接
-      const isSafeProtocol = /^https?:\/\//i.test(safeUrl) || !/^[a-z]+:/i.test(normalizedUrl)
-      const href = isSafeProtocol ? safeUrl : '#'
-      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`
-    })
-    // 引用
-    .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
-    // 标题
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    // 无序列表
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    // 有序列表
-    .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
-    // 段落
-    .replace(/\n\n/g, '</p><p>')
-    // 换行
-    .replace(/\n/g, '<br>')
-
-  return `<p>${html}</p>`
+  return `<p>${applyCommonTransformations(text, codeBlockWithEncoding)}</p>`
 }
 
 /**

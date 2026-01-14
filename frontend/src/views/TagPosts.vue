@@ -61,6 +61,7 @@ import { NSpin, NButton, NTag } from 'naive-ui'
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
 import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
 import { useBlogStore } from '@/stores/blog'
+import { formatDate } from '@/utils/date'
 
 const router = useRouter()
 const route = useRoute()
@@ -77,14 +78,6 @@ const filteredPosts = computed(() => {
     post.tags.some(t => t.toLowerCase() === tag.value.toLowerCase())
   )
 })
-
-const formatDate = (date: string) => {
-  return new Date(date).toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
-}
 
 const readMore = (id: number) => {
   router.push(`/article/${id}`)

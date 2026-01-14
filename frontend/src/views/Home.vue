@@ -206,6 +206,9 @@ import HandDrawnCard from '@/components/HandDrawnCard.vue'
 import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
 import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
 
+// 导入共享工具函数
+import { formatDate, formatShortDate } from '@/utils/date'
+
 // ========== 组合式函数 ==========
 
 // 路由实例，用于页面跳转
@@ -255,31 +258,6 @@ const recentPosts = computed(() => {
 })
 
 // ========== 方法 ==========
-
-/**
- * 格式化日期（完整格式）
- * @param date ISO 日期字符串
- * @returns 格式化的中文日期字符串
- */
-const formatDate = (date: string) => {
-  return new Date(date).toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
-}
-
-/**
- * 格式化日期（简短格式）
- * @param date ISO 日期字符串
- * @returns 简短的中文日期字符串
- */
-const formatShortDate = (date: string) => {
-  return new Date(date).toLocaleDateString('zh-CN', {
-    month: 'short',
-    day: 'numeric'
-  })
-}
 
 /**
  * 阅读更多：跳转到文章详情页

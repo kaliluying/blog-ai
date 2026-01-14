@@ -93,6 +93,7 @@ import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
 // 导入 Store 和 API
 import { useBlogStore } from '@/stores/blog'
 import { blogApi, type BlogPost } from '@/api'
+import { formatDate } from '@/utils/date'
 
 // ========== 组合式函数 ==========
 
@@ -158,19 +159,6 @@ const handleDelete = async (id: number) => {
   } catch (e) {
     message.error('删除失败')
   }
-}
-
-/**
- * 格式化日期
- * @param date ISO 日期字符串
- * @returns 格式化的中文日期
- */
-const formatDate = (date: string) => {
-  return new Date(date).toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
 }
 
 /**

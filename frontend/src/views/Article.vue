@@ -100,6 +100,7 @@ import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
 // 导入 API 和工具函数
 import { blogApi, commentApi, type BlogPost, type Comment } from '@/api'
 import { renderMarkdownWithCodeSafe, decodeCode } from '@/utils/markdown'
+import { formatDate } from '@/utils/date'
 
 // 导入评论组件
 import CommentSection from '@/components/CommentSection.vue'
@@ -178,19 +179,6 @@ const fetchPost = async () => {
   } finally {
     loading.value = false  // 结束加载
   }
-}
-
-/**
- * 格式化日期
- * @param date ISO 日期字符串
- * @returns 格式化的中文日期
- */
-const formatDate = (date: string) => {
-  return new Date(date).toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
 }
 
 /**

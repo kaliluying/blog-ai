@@ -177,6 +177,7 @@ import { useMessage, NPopconfirm } from 'naive-ui'
 import { useAuthStore } from '@/stores/auth'
 import { commentApi, type Comment } from '@/api'
 import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
+import { formatDate } from '@/utils/date'
 
 const props = defineProps<{
   postId: number
@@ -203,14 +204,6 @@ onMounted(async () => {
     await authStore.init()
   }
 })
-
-const formatDate = (date: string) => {
-  return new Date(date).toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
-}
 
 const canDelete = (comment: Comment) => {
   return authStore.isAdmin || comment.user_id === authStore.user?.id
