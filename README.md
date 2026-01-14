@@ -11,9 +11,10 @@
 - **管理后台**: 完整的文章管理功能（新建、编辑、删除、搜索）
 - **标签系统**: 支持文章标签分类、标签云展示和标签筛选
 - **文章归档**: 按年月组织文章，快速浏览历史内容
-- **评论系统**: 支持嵌套回复、删除确认
+- **评论系统**: 支持匿名评论、嵌套回复、昵称自动生成
+- **阅读量统计**: 记录文章浏览量，支持热门文章排行
 - **搜索功能**: 全文搜索文章标题和内容
-- **用户认证**: JWT Token 认证系统
+- **管理员认证**: 简化的密码认证系统
 
 ## 技术栈
 
@@ -25,14 +26,14 @@
 - **Pinia** - Vue 状态管理
 - **Vue Router** - 路由管理
 - **Axios** - HTTP 客户端
-- **Vitest** - 单元测试框架
+- **DOMPurify** - XSS 防护
 
 ### 后端
 - **FastAPI** - 现代 Python Web 框架
-- **SQLAlchemy** - Python SQL 工具包
+- **SQLAlchemy 2.0** - Python SQL 工具包（异步支持）
 - **PostgreSQL** - 关系型数据库
 - **asyncpg** - PostgreSQL 异步驱动
-- **Pytest** - Python 测试框架
+- **Alembic** - 数据库迁移工具
 
 ## 项目结构
 
@@ -48,7 +49,8 @@ blog-ai/
 │   │   │   ├── HandDrawnDivider.vue   # 手绘分割线组件
 │   │   │   ├── HandDrawnConfirm.vue   # 手绘确认对话框
 │   │   │   ├── HandDrawnBackground.vue# 手绘背景组件
-│   │   │   └── CommentSection.vue     # 评论组件
+│   │   │   ├── CommentSection.vue     # 评论组件
+│   │   │   └── TableOfContents.vue    # 文章目录组件
 │   │   ├── router/           # 路由配置
 │   │   ├── stores/           # Pinia 状态管理
 │   │   ├── views/            # 页面视图
@@ -58,27 +60,27 @@ blog-ai/
 │   │   │   ├── ArchiveMonth.vue     # 月度归档页
 │   │   │   ├── TagPosts.vue         # 标签文章页
 │   │   │   ├── Search.vue           # 搜索结果页
+│   │   │   ├── AdminLogin.vue       # 管理员登录页
 │   │   │   ├── AdminPosts.vue       # 文章管理页
 │   │   │   └── AdminPostNew.vue     # 新建/编辑文章页
 │   │   ├── App.vue            # 根组件
 │   │   └── main.ts            # 入口文件
 │   ├── package.json
-│   ├── vite.config.ts
-│   └── vitest.config.ts       # Vitest 测试配置
+│   └── vite.config.ts
 │
 ├── backend/                  # FastAPI 后端项目
 │   ├── main.py               # FastAPI 应用入口
 │   ├── models.py             # SQLAlchemy 模型
 │   ├── schemas.py            # Pydantic 模式
 │   ├── crud.py               # 数据库操作
-│   ├── auth.py               # 认证相关
 │   ├── database.py           # 数据库连接
+│   ├── auth.py               # 管理员认证
+│   ├── migrations/           # Alembic 迁移脚本
+│   │   └── versions/         # 迁移版本
 │   ├── pyproject.toml        # Python 依赖配置
-│   └── tests/                # 测试文件
-│       ├── conftest.py       # 测试夹具
-│       ├── test_auth.py      # 认证 API 测试
-│       └── test_posts.py     # 文章 API 测试
+│   └── .env                  # 环境变量配置
 │
+├── CLAUDE.md                 # Claude Code 指导文件
 └── README.md                 # 项目说明文档
 ```
 
@@ -106,10 +108,12 @@ cd backend
 uv sync
 
 # 配置数据库连接
-# 编辑 .env 文件或使用默认配置
+# 编辑 .env 文件
+# DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/blog_ai
+# 设置管理员密码: ADMIN_PASSWORD=your_password
 
-# 初始化数据库表
-uv run python -c "from database import init_db; import asyncio; asyncio.run(init_db())"
+# 运行数据库迁移
+uv run alembic upgrade head
 
 # 启动服务
 uv run python main.py
@@ -152,13 +156,12 @@ uv run pytest
 
 ## API 接口
 
-### 认证
+### 管理员认证
 
 | 方法 | 端点 | 描述 |
 |------|------|------|
-| POST | `/api/auth/register` | 用户注册 |
-| POST | `/api/auth/login` | 用户登录 |
-| GET | `/api/auth/me` | 获取当前用户信息 |
+| POST | `/api/admin/login` | 管理员登录 |
+| POST | `/api/admin/logout` | 管理员登出 |
 
 ### 文章
 
@@ -166,9 +169,13 @@ uv run pytest
 |------|------|------|------|
 | GET | `/api/posts` | 获取所有文章列表 | 否 |
 | GET | `/api/posts/{id}` | 获取单篇文章详情 | 否 |
+| GET | `/api/posts/count` | 获取文章总数 | 否 |
+| GET | `/api/posts/popular` | 获取热门文章排行 | 否 |
 | POST | `/api/posts` | 创建新文章 | 管理员 |
 | PUT | `/api/posts/{id}` | 更新文章 | 管理员 |
 | DELETE | `/api/posts/{id}` | 删除文章 | 管理员 |
+| POST | `/api/posts/{id}/view` | 记录文章浏览 | 否 |
+| POST | `/api/posts/check-title` | 检查标题是否重复 | 管理员 |
 | GET | `/api/search?q=` | 搜索文章 | 否 |
 
 ### 归档
@@ -184,10 +191,17 @@ uv run pytest
 | 方法 | 端点 | 描述 | 认证 |
 |------|------|------|------|
 | GET | `/api/posts/{id}/comments` | 获取文章评论 | 否 |
-| POST | `/api/comments` | 创建评论/回复 | 是 |
-| DELETE | `/api/comments/{id}` | 删除评论 | 是 |
+| POST | `/api/comments` | 创建评论（匿名） | 否 |
+| DELETE | `/api/comments/{id}` | 删除评论 | 管理员 |
 
 ### 请求示例
+
+**管理员登录**
+```bash
+curl -X POST http://localhost:8000/api/admin/login \
+  -H "Content-Type: application/json" \
+  -d '{"password": "admin123"}'
+```
 
 **创建文章**
 ```bash
@@ -207,13 +221,12 @@ curl -X POST http://localhost:8000/api/posts \
 | 路径 | 页面 | 描述 |
 |------|------|------|
 | `/` | Home | 首页，展示文章列表和侧边栏 |
-| `/article/:id` | Article | 文章详情页 |
+| `/article/:id` | Article | 文章详情页（含目录和评论） |
 | `/archive` | Archive | 文章归档页（按年月分组） |
 | `/archive/:year/:month` | ArchiveMonth | 月度归档页 |
 | `/tag/:tag` | TagPosts | 标签筛选页 |
-| `/search?q=` | Search | 搜索结果页 |
-| `/login` | Login | 登录页 |
-| `/register` | Register | 注册页 |
+| `/search` | Search | 搜索结果页 |
+| `/admin/login` | AdminLogin | 管理员登录页 |
 | `/admin/posts` | AdminPosts | 文章管理页面 |
 | `/admin/posts/new` | AdminPostNew | 新建文章页面 |
 | `/admin/posts/:id` | AdminPostNew | 编辑文章页面 |
@@ -248,7 +261,7 @@ curl -X POST http://localhost:8000/api/posts \
 可用图标类型：`star`、`heart`、`bookmark`、`comment`
 
 ### CommentSection
-评论组件，支持嵌套回复。
+评论组件，支持匿名评论和嵌套回复。
 
 ```vue
 <CommentSection
@@ -256,6 +269,13 @@ curl -X POST http://localhost:8000/api/posts \
   :comments="comments"
   @refresh="fetchComments"
 />
+```
+
+### TableOfContents
+文章目录组件，自动提取标题生成目录。
+
+```vue
+<TableOfContents :toc="toc" />
 ```
 
 ## 自定义配置
@@ -266,6 +286,14 @@ curl -X POST http://localhost:8000/api/posts \
 
 ```env
 VITE_API_BASE_URL=http://localhost:8000
+```
+
+### 修改管理员密码
+
+编辑 `backend/.env` 文件：
+
+```env
+ADMIN_PASSWORD=your_password
 ```
 
 ### 修改手绘风格参数
