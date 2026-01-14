@@ -289,7 +289,7 @@ def post_to_list_item(post: BlogPost) -> dict:
     }
 
 
-def comment_to_dict(comment: Comment, nickname: str = None) -> dict:
+def comment_to_dict(comment: Comment, nickname: str | None = None) -> dict:
     """将 Comment ORM 模型转换为字典（匿名评论使用 nickname）"""
     return {
         "id": comment.id,

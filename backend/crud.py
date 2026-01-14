@@ -101,7 +101,7 @@ async def check_post_title_exists(
 
 
 async def create_post(
-    db: AsyncSession, post: BlogPostCreate, tags: List[str] = None
+    db: AsyncSession, post: BlogPostCreate, tags: List[str] | None = None
 ) -> BlogPost:
     """
     创建新文章
@@ -134,7 +134,7 @@ async def create_post(
 
 
 async def update_post(
-    db: AsyncSession, post_id: int, post_update: BlogPostUpdate, tags: List[str] = None
+    db: AsyncSession, post_id: int, post_update: BlogPostUpdate, tags: List[str] | None = None
 ) -> Optional[BlogPost]:
     """
     更新文章
