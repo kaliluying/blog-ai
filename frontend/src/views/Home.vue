@@ -13,6 +13,9 @@
     <!-- 手绘风格背景组件 -->
     <HandDrawnBackground />
 
+    <!-- 页面两侧装饰 -->
+    <PageDecorations />
+
     <!-- 主内容容器：左右两栏布局 -->
     <div class="main-container">
 
@@ -210,6 +213,7 @@ const POSTS_PER_PAGE = 10
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
 import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
 import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
+import PageDecorations from '@/components/PageDecorations.vue'
 import PopularPosts from '@/components/PopularPosts.vue'
 
 // 导入共享工具函数
@@ -318,10 +322,12 @@ const goToTag = (tag: string) => {
   margin: 0 auto;
   display: flex;
   gap: 32px;
+  align-items: flex-start;
 }
 
 .left-section {
   flex: 3;
+  min-width: 0;
 }
 
 .right-section {
@@ -330,6 +336,9 @@ const goToTag = (tag: string) => {
   flex-direction: column;
   gap: 16px;
   min-width: 260px;
+  position: sticky;
+  top: 80px;
+  align-self: flex-start;
 }
 
 .hero-section {

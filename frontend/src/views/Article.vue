@@ -417,12 +417,16 @@ onUnmounted(() => {
 }
 
 .article-sidebar {
-  position: relative;
+  position: sticky;
+  top: 100px;
   display: flex;
   flex-direction: column;
   gap: 16px;
   width: 260px;
   flex-shrink: 0;
+  align-self: flex-start;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
 }
 
 .article-card {

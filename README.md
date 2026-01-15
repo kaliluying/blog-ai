@@ -57,6 +57,7 @@ blog-ai/
 │   │   │   ├── RelatedPosts.vue       # 相关文章推荐组件
 │   │   │   ├── ArticleSidebar.vue     # 文章侧边栏组件
 │   │   │   ├── PopularPosts.vue       # 热门文章组件
+│   │   │   ├── PageDecorations.vue    # 页面装饰组件
 │   │   │   └── icons/                 # 标准 SVG 图标组件
 │   │   ├── router/           # 路由配置
 │   │   ├── stores/           # Pinia 状态管理
@@ -90,8 +91,17 @@ blog-ai/
 │   ├── migrations/           # Alembic 迁移脚本
 │   │   └── versions/         # 迁移版本
 │   ├── pyproject.toml        # Python 依赖配置
-│   └── .env                  # 环境变量配置
+│   ├── .env                  # 环境变量配置
+│   ├── Dockerfile            # Docker 构建文件
+│   └── .dockerignore         # Docker 构建忽略文件
 │
+├── frontend/                 # Vue 3 前端项目
+│   ├── Dockerfile            # Docker 构建文件
+│   ├── nginx.conf            # Nginx 配置
+│   ├── .dockerignore         # Docker 构建忽略文件
+│   └── ...（其他前端文件）
+│
+├── docker-compose.yml        # Docker Compose 配置
 ├── CLAUDE.md                 # Claude Code 指导文件
 └── README.md                 # 项目说明文档
 ```
@@ -164,6 +174,59 @@ npm run test
 # 后端测试
 cd backend
 uv run pytest
+```
+
+## Docker 部署（可选）
+
+项目支持使用 Docker Compose 进行容器化部署，包含前端、后端和 PostgreSQL 数据库。
+
+### 环境要求
+
+- Docker Engine >= 20.10
+- Docker Compose >= 2.0
+
+### 快速启动
+
+```bash
+# 构建并启动所有服务（后台运行）
+docker-compose up -d
+
+# 查看日志
+docker-compose logs -f
+
+# 停止所有服务
+docker-compose down
+
+# 重新构建镜像并启动
+docker-compose up -d --build
+```
+
+### 服务端口
+
+| 服务 | 端口 | 描述 |
+|------|------|------|
+| 前端 | 80 | Nginx 静态资源服务器 |
+| 后端 | 8000 | FastAPI 服务 |
+| 数据库 | 5432 | PostgreSQL 数据库 |
+
+### 默认配置
+
+- **数据库**: `postgresql://blog:blog_password@localhost:5432/blog`
+- **管理员密码**: `admin123`
+- **数据持久化**: PostgreSQL 数据存储在 `postgres_data` 卷中
+
+### 目录结构（Docker 相关）
+
+```
+blog-ai/
+├── docker-compose.yml         # Docker Compose 配置
+├── backend/
+│   ├── Dockerfile             # 后端镜像构建文件
+│   └── .dockerignore          # 后端构建忽略文件
+├── frontend/
+│   ├── Dockerfile             # 前端镜像构建文件
+│   ├── nginx.conf             # Nginx 配置
+│   └── .dockerignore          # 前端构建忽略文件
 ```
 
 ## API 接口

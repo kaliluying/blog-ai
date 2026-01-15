@@ -53,9 +53,7 @@ const scrollTo = (id: string) => {
 
 <style scoped>
 .toc-container {
-  position: sticky;
-  top: 100px;
-  overflow-y: auto;
+  width: 100%;
 }
 
 .toc-card {

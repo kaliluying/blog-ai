@@ -75,6 +75,22 @@ uv run alembic current
 uv run alembic downgrade -1
 ```
 
+### Docker
+
+```bash
+# Build and start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop all services
+docker-compose down
+
+# Rebuild images
+docker-compose up -d --build
+```
+
 ### Admin Authentication
 
 The blog uses a simplified admin authentication system (no JWT, no user registration):

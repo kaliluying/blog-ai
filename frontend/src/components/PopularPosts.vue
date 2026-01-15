@@ -149,13 +149,14 @@ const readMore = (id: number) => {
 .popular-post-content {
   flex: 1;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
 }
 
 .popular-post-title {
-  font-size: 0.9rem;
+  flex: 1;
+  font-size: 0.85rem;
   color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -165,5 +166,6 @@ const readMore = (id: number) => {
 .popular-post-views {
   font-size: 0.75rem;
   color: var(--text-secondary);
+  flex-shrink: 0;
 }
 </style>
