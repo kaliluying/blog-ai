@@ -23,6 +23,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useDebounceFn } from '@vueuse/core'
 import { blogApi, type BlogPost } from '@/api'
 import { formatDate } from '@/utils/date'
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
@@ -54,6 +55,9 @@ const fetchRelatedPosts = async () => {
   }
 }
 
+// 使用防抖避免重复请求
+const debouncedFetch = useDebounceFn(fetchRelatedPosts, 300)
+
 const goToPost = (id: number) => {
   router.push(`/article/${id}`)
 }
@@ -63,7 +67,7 @@ onMounted(() => {
 })
 
 watch(() => props.postId, () => {
-  fetchRelatedPosts()
+  debouncedFetch()
 })
 </script>
 

@@ -16,7 +16,7 @@
 
 # 标准库导入
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 # 第三方库导入
@@ -361,11 +361,6 @@ async def get_archive_by_year(db: AsyncSession, year: int) -> List[BlogPost]:
     return result.scalars().all()
 
 
-def get_utc_now():
-    """获取当前 UTC 时间（timezone-aware）"""
-    return datetime.now(timezone.utc)
-
-
 async def get_post_view_count(db: AsyncSession, post_id: int) -> int:
     """
     获取文章阅读量
@@ -429,7 +424,7 @@ async def check_view_record_exists(db: AsyncSession, post_id: int, ip: str) -> b
         {
             "post_id": post_id,
             "ip": ip,
-            "expired_at": get_utc_now() - timedelta(hours=24)
+            "expired_at": utc_now() - timedelta(hours=24)
         }
     )
     return result.scalar_one_or_none() is not None
@@ -447,7 +442,7 @@ async def record_post_view(db: AsyncSession, post_id: int, ip: str) -> bool:
     Returns:
         bool: 是否成功计数（False 表示已在 24 小时内记录过）
     """
-    now = get_utc_now()
+    now = utc_now()
 
     # 检查是否已记录
     if await check_view_record_exists(db, post_id, ip):
@@ -557,7 +552,7 @@ async def cleanup_expired_view_records(db: AsyncSession, days: int = 30) -> int:
             WHERE viewed_at < :expired_at
         """),
         {
-            "expired_at": get_utc_now() - timedelta(days=days)
+            "expired_at": utc_now() - timedelta(days=days)
         }
     )
     await db.commit()

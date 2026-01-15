@@ -135,9 +135,12 @@ Views -> Pinia Store (blog.ts) -> blogApi (api/index.ts) -> FastAPI Backend
 | GET | `/api/posts` | List posts (supports ?skip=&limit=) | No |
 | GET | `/api/posts/count` | Get total post count | No |
 | GET | `/api/posts/{id}` | Get single post | No |
+| GET | `/api/posts/{id}/related` | Get related posts by tags | No |
+| GET | `/api/posts/popular` | Get popular posts by view count | No |
 | POST | `/api/posts` | Create post | Admin |
 | PUT | `/api/posts/{id}` | Update post | Admin |
 | DELETE | `/api/posts/{id}` | Delete post | Admin |
+| POST | `/api/posts/{id}/view` | Record post view (IP-limited) | No |
 | GET | `/api/search?q=` | Search posts | No |
 | GET | `/api/archive` | All archives by year/month | No |
 | GET | `/api/archive/{year}` | Archives by year | No |
@@ -166,11 +169,15 @@ Views -> Pinia Store (blog.ts) -> blogApi (api/index.ts) -> FastAPI Backend
 - `frontend/src/api/index.ts` - Axios client with all API methods and type definitions
 - `frontend/src/stores/blog.ts` - Pinia store for post state with pagination support
 - `frontend/src/stores/auth.ts` - Pinia store for admin authentication state
+- `frontend/src/stores/theme.ts` - Theme store with light/dark/system mode support
 - `frontend/src/views/AdminLogin.vue` - Admin login page with password authentication
 - `frontend/src/utils/markdown.ts` - Markdown rendering with XSS protection
 - `frontend/src/utils/date.ts` - Shared date formatting utilities
 - `frontend/src/components/TableOfContents.vue` - Article TOC with scroll spy
 - `frontend/src/components/CommentSection.vue` - Nested anonymous comments component
+- `frontend/src/components/RelatedPosts.vue` - Related posts by tags component
+- `frontend/src/components/ArticleSidebar.vue` - Sidebar with author info, tags, popular posts
+- `frontend/src/components/icons/` - Standard SVG icon components
 - `frontend/src/views/Article.vue` - Article detail page
 - `backend/main.py` - FastAPI app with all routes
 - `backend/models.py` - SQLAlchemy 2.0 ORM models with `Mapped[T]`
@@ -178,11 +185,13 @@ Views -> Pinia Store (blog.ts) -> blogApi (api/index.ts) -> FastAPI Backend
 - `backend/schemas.py` - Pydantic v2 models with `model_config`
 - `backend/auth.py` - Admin password authentication utilities
 - `backend/database.py` - Database connection with `DeclarativeBase`
+- `backend/utils/time.py` - UTC time utilities for timezone-aware datetime
 - `backend/migrations/` - Alembic migration scripts
 
 ## Development Patterns
 
 - **New components**: Place in `frontend/src/components/` with `HandDrawn*` prefix for hand-drawn style
+- **Standard icons**: Place in `frontend/src/components/icons/` (SVG icons without Rough.js)
 - **New views**: Place in `frontend/src/views/` and add routes in `frontend/src/router/index.ts`
 - **Shared utilities**: Place in `frontend/src/utils/`
 - **Composables**: Place in `frontend/src/composables/`
@@ -190,6 +199,8 @@ Views -> Pinia Store (blog.ts) -> blogApi (api/index.ts) -> FastAPI Backend
 - **Date formatting**: Use `formatDate` from `utils/date.ts` for consistent formatting
 - **Model changes**: Generate migrations with `alembic revision --autogenerate` after modifying `models.py`
 - **Comments**: Anonymous comments use `nickname` field, stored in localStorage for convenience
+- **Debouncing**: Use `useDebounceFn` from `@vueuse/core` for debounced API calls
+- **Memory cleanup**: Return cleanup functions from `init()` methods and call them on unmount
 
 ## Tech Stack Notes
 

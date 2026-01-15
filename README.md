@@ -4,6 +4,7 @@
 
 ## 特性
 
+- **暗黑模式**: 支持亮色/暗黑/系统自动三种主题模式
 - **手绘风格界面**: 使用 Rough.js 生成的独特手绘边框和装饰效果
 - **Markdown 支持**: 文章编辑和阅读均支持 Markdown 语法
 - **代码高亮与复制**: 文章中的代码块支持语法高亮和一键复制
@@ -13,6 +14,7 @@
 - **文章归档**: 按年月组织文章，快速浏览历史内容
 - **评论系统**: 支持匿名评论、嵌套回复、昵称自动生成
 - **阅读量统计**: 记录文章浏览量，支持热门文章排行
+- **相关文章推荐**: 基于标签匹配推荐相关文章
 - **搜索功能**: 全文搜索文章标题和内容
 - **管理员认证**: 简化的密码认证系统
 
@@ -27,6 +29,7 @@
 - **Vue Router** - 路由管理
 - **Axios** - HTTP 客户端
 - **DOMPurify** - XSS 防护
+- **VueUse** - Vue 3 实用工具库
 
 ### 后端
 - **FastAPI** - 现代 Python Web 框架
@@ -50,9 +53,16 @@ blog-ai/
 │   │   │   ├── HandDrawnConfirm.vue   # 手绘确认对话框
 │   │   │   ├── HandDrawnBackground.vue# 手绘背景组件
 │   │   │   ├── CommentSection.vue     # 评论组件
-│   │   │   └── TableOfContents.vue    # 文章目录组件
+│   │   │   ├── TableOfContents.vue    # 文章目录组件
+│   │   │   ├── RelatedPosts.vue       # 相关文章推荐组件
+│   │   │   ├── ArticleSidebar.vue     # 文章侧边栏组件
+│   │   │   ├── PopularPosts.vue       # 热门文章组件
+│   │   │   └── icons/                 # 标准 SVG 图标组件
 │   │   ├── router/           # 路由配置
 │   │   ├── stores/           # Pinia 状态管理
+│   │   │   ├── blog.ts       # 文章状态管理
+│   │   │   ├── auth.ts       # 认证状态管理
+│   │   │   └── theme.ts      # 主题状态管理
 │   │   ├── views/            # 页面视图
 │   │   │   ├── Home.vue             # 首页
 │   │   │   ├── Article.vue          # 文章详情页
@@ -75,6 +85,8 @@ blog-ai/
 │   ├── crud.py               # 数据库操作
 │   ├── database.py           # 数据库连接
 │   ├── auth.py               # 管理员认证
+│   ├── utils/                # 工具模块
+│   │   └── time.py           # 时间工具函数
 │   ├── migrations/           # Alembic 迁移脚本
 │   │   └── versions/         # 迁移版本
 │   ├── pyproject.toml        # Python 依赖配置
@@ -169,6 +181,7 @@ uv run pytest
 |------|------|------|------|
 | GET | `/api/posts` | 获取所有文章列表 | 否 |
 | GET | `/api/posts/{id}` | 获取单篇文章详情 | 否 |
+| GET | `/api/posts/{id}/related` | 获取相关文章推荐 | 否 |
 | GET | `/api/posts/count` | 获取文章总数 | 否 |
 | GET | `/api/posts/popular` | 获取热门文章排行 | 否 |
 | POST | `/api/posts` | 创建新文章 | 管理员 |
@@ -278,6 +291,37 @@ curl -X POST http://localhost:8000/api/posts \
 <TableOfContents :toc="toc" />
 ```
 
+### RelatedPosts
+相关文章推荐组件，基于标签匹配推荐相关文章。
+
+```vue
+<RelatedPosts :post-id="post.id" :tags="post.tags" />
+```
+
+### ArticleSidebar
+文章侧边栏组件，包含博主信息、文章标签和热门文章。
+
+```vue
+<ArticleSidebar :tags="post.tags" />
+```
+
+### 主题切换
+应用支持三种主题模式：亮色、暗色、系统自动。
+
+```typescript
+import { useThemeStore } from '@/stores/theme'
+
+const themeStore = useThemeStore()
+
+// 设置主题
+themeStore.setTheme('light')   // 亮色模式
+themeStore.setTheme('dark')    // 暗黑模式
+themeStore.setTheme('system')  // 系统自动
+
+// 切换主题
+themeStore.toggleTheme()
+```
+
 ## 自定义配置
 
 ### 修改 API 地址
@@ -323,3 +367,5 @@ MIT License
 - [Naive UI](https://www.naiveui.com/)
 - [Rough.js](https://roughjs.com/)
 - [FastAPI](https://fastapi.tiangolo.com/)
+- [VueUse](https://vueuse.org/)
+- [Ionicons](https://ionic.io/ionicons) (图标资源)

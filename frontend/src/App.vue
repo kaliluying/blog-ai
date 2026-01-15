@@ -78,71 +78,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, h, computed } from 'vue'
+import { ref, computed, h } from 'vue'
 import { useRouter } from 'vue-router'
 import { NIcon, type GlobalThemeOverrides, darkTheme } from 'naive-ui'
 
 import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
+import { SearchIcon, WriteIcon, LogoutIcon, SunIcon, MoonIcon, SystemIcon } from '@/components/icons'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
-
-// SVG 图标组件
-const SearchIcon = {
-  render() {
-    return h('svg', {
-      xmlns: 'http://www.w3.org/2000/svg',
-      viewBox: '0 0 512 512',
-      width: 16,
-      height: 16,
-      fill: 'currentColor'
-    }, [
-      h('path', {
-        fill: 'none',
-        stroke: 'currentColor',
-        'stroke-linecap': 'round',
-        'stroke-linejoin': 'round',
-        'stroke-width': '32',
-        d: 'M221.09 64a157.09 157.09 0 1 0 157.09 157.09A157.1 157.1 0 0 0 221.09 64z'
-      }),
-      h('path', {
-        fill: 'none',
-        stroke: 'currentColor',
-        'stroke-linecap': 'round',
-        'stroke-linejoin': 'round',
-        'stroke-width': '32',
-        d: 'M338.29 338.29L448 448'
-      })
-    ])
-  }
-}
-
-const WriteIcon = {
-  render() {
-    return h('svg', {
-      xmlns: 'http://www.w3.org/2000/svg',
-      viewBox: '0 0 24 24',
-      width: 16,
-      height: 16,
-      fill: 'currentColor'
-    }, [
-      h('path', { d: 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z' })
-    ])
-  }
-}
-
-const LogoutIcon = {
-  render() {
-    return h('svg', {
-      xmlns: 'http://www.w3.org/2000/svg',
-      viewBox: '0 0 24 24',
-      width: 16,
-      height: 16,
-      fill: 'currentColor'
-    }, [
-      h('path', { d: 'M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z' })
-    ])
-  }
-}
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -152,40 +95,9 @@ const searchQuery = ref('')
 
 const themeIcon = computed(() => {
   switch (themeStore.theme) {
-    case 'light':
-      return {
-        render() {
-          return h('svg', { xmlns: 'http://www.w3.org/2000/svg', viewBox: '0 0 24 24', width: 18, height: 18, fill: 'currentColor' }, [
-            h('circle', { cx: '12', cy: '12', r: '5' }),
-            h('line', { x1: '12', y1: '1', x2: '12', y2: '3', stroke: 'currentColor', 'stroke-width': '2' }),
-            h('line', { x1: '12', y1: '21', x2: '12', y2: '23', stroke: 'currentColor', 'stroke-width': '2' }),
-            h('line', { x1: '4.22', y1: '4.22', x2: '5.64', y2: '5.64', stroke: 'currentColor', 'stroke-width': '2' }),
-            h('line', { x1: '18.36', y1: '18.36', x2: '19.78', y2: '19.78', stroke: 'currentColor', 'stroke-width': '2' }),
-            h('line', { x1: '1', y1: '12', x2: '3', y2: '12', stroke: 'currentColor', 'stroke-width': '2' }),
-            h('line', { x1: '21', y1: '12', x2: '23', y2: '12', stroke: 'currentColor', 'stroke-width': '2' }),
-            h('line', { x1: '4.22', y1: '19.78', x2: '5.64', y2: '18.36', stroke: 'currentColor', 'stroke-width': '2' }),
-            h('line', { x1: '18.36', y1: '5.64', x2: '19.78', y2: '4.22', stroke: 'currentColor', 'stroke-width': '2' })
-          ])
-        }
-      }
-    case 'dark':
-      return {
-        render() {
-          return h('svg', { xmlns: 'http://www.w3.org/2000/svg', viewBox: '0 0 24 24', width: 18, height: 18, fill: 'currentColor' }, [
-            h('path', { d: 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z' })
-          ])
-        }
-      }
-    default:
-      return {
-        render() {
-          return h('svg', { xmlns: 'http://www.w3.org/2000/svg', viewBox: '0 0 24 24', width: 18, height: 18, fill: 'currentColor' }, [
-            h('rect', { x: '2', y: '3', width: '20', height: '14', rx: '2', ry: '2' }),
-            h('line', { x1: '8', y1: '21', x2: '16', y2: '21', stroke: 'currentColor', 'stroke-width': '2' }),
-            h('line', { x1: '12', y1: '17', x2: '12', y2: '21', stroke: 'currentColor', 'stroke-width': '2' })
-          ])
-        }
-      }
+    case 'light': return SunIcon
+    case 'dark': return MoonIcon
+    default: return SystemIcon
   }
 })
 

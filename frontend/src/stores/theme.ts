@@ -20,11 +20,24 @@ export const useThemeStore = defineStore('theme', () => {
     }
     updateTheme()
 
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    const handleChange = () => {
       if (theme.value === 'system') {
         updateTheme()
       }
-    })
+    }
+    mediaQuery.addEventListener('change', handleChange)
+
+    // 返回清理函数，用于移除事件监听器
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }
+
+  const destroy = () => {
+    const saved = localStorage.getItem('themeMode') as ThemeMode | null
+    if (saved) {
+      theme.value = saved
+    }
+    updateTheme()
   }
 
   const setTheme = (newTheme: ThemeMode) => {
@@ -56,6 +69,7 @@ export const useThemeStore = defineStore('theme', () => {
     theme,
     isDark,
     init,
+    destroy,
     setTheme,
     toggleTheme,
     updateTheme,
