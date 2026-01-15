@@ -23,15 +23,18 @@ import { ref, onMounted, watch } from 'vue'
 // 导入 Rough.js 库
 import rough from 'roughjs'
 
+// 导入主题 store
+import { useThemeStore } from '@/stores/theme'
+
 // ========== Props 定义 ==========
 
 /**
  * 组件属性
- * @param type - 图标类型：'star' | 'heart' | 'bookmark' | 'comment'
+ * @param type - 图标类型：'star' | 'heart' | 'bookmark' | 'comment' | 'tag'
  * @param size - 图标尺寸（像素），默认 24px
  */
 const props = defineProps<{
-  type: 'star' | 'heart' | 'bookmark' | 'comment'
+  type: 'star' | 'heart' | 'bookmark' | 'comment' | 'tag'
   size?: number
 }>()
 
@@ -40,13 +43,24 @@ const props = defineProps<{
 // DOM 元素引用
 const iconRef = ref<HTMLElement | null>(null)
 
+// 主题 store 实例
+const themeStore = useThemeStore()
+
+// 根据主题获取颜色
+const getStrokeColor = (defaultColor: string) => {
+  if (themeStore.isDark && defaultColor === '#34495e') {
+    return '#4a5568' // 暗黑模式下的深色
+  }
+  return defaultColor
+}
+
 // ========== 图标绘制函数 ==========
 
 /**
  * 图标类型映射表
  * 每种图标类型对应一个绘制函数，返回 Rough.js 节点数组
  */
-const icons: Record<string, (x: number, y: number, size: number) => rough.Node[]> = {
+const icons: Record<string, (x: number, y: number, size: number) => SVGElement[]> = {
   /**
    * 星星图标
    * 使用五角星几何计算，绘制 10 个顶点（5 外 + 5 内）
@@ -68,7 +82,7 @@ const icons: Record<string, (x: number, y: number, size: number) => rough.Node[]
 
     // 绘制多边形
     return [generator.polygon(points, {
-      stroke: '#34495e',   // 深蓝灰色描边
+      stroke: getStrokeColor('#34495e'),   // 根据主题动态颜色
       strokeWidth: 2,      // 描边宽度
       fill: 'none',        // 无填充
       roughness: 1.5       // 适中粗糙度
@@ -87,7 +101,7 @@ const icons: Record<string, (x: number, y: number, size: number) => rough.Node[]
       C ${x + size * 0.5} ${y + size * 0.4}, ${x + size * 0.5} ${y - size * 0.2}, ${x} ${y + size * 0.3}`
 
     return [generator.path(path, {
-      stroke: '#e74c3c',   // 红色描边
+      stroke: getStrokeColor('#e74c3c'),   // 红色描边（主题自适应）
       strokeWidth: 2,
       fill: 'none',
       roughness: 1         // 较低粗糙度（心形较圆润）
@@ -109,9 +123,9 @@ const icons: Record<string, (x: number, y: number, size: number) => rough.Node[]
        L ${x + size * 0.3} ${y - size * 0.4}
        Z`,
       {
-        stroke: '#34495e',
+        stroke: getStrokeColor('#34495e'),   // 根据主题动态颜色
         strokeWidth: 2,
-        fill: '#f39c12',         // 橙色填充
+        fill: themeStore.isDark ? '#b7791f' : '#f39c12',  // 主题自适应填充色
         fillStyle: 'hachure',    // 填充样式：影线
         roughness: 1.5
       }
@@ -119,19 +133,41 @@ const icons: Record<string, (x: number, y: number, size: number) => rough.Node[]
   },
 
   /**
-   * 评论/对话框图标
-   * 矩形气泡形状
-   */
-  comment: (x, y, size) => {
-    const generator = rough.svg(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
-    // 矩形（气泡形状）
-    return [generator.rectangle(x - size * 0.4, y - size * 0.3, size * 0.8, size * 0.6, {
-      stroke: '#34495e',
+ * 评论/对话框图标
+ * 矩形气泡形状
+ */
+comment: (x, y, size) => {
+  const generator = rough.svg(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
+  // 矩形（气泡形状）
+  return [generator.rectangle(x - size * 0.4, y - size * 0.3, size * 0.8, size * 0.6, {
+    stroke: getStrokeColor('#34495e'),   // 根据主题动态颜色
+    strokeWidth: 2,
+    fill: 'none',
+    roughness: 1.2
+  })]
+},
+
+/**
+ * 标签图标
+ * 标签形状
+ */
+tag: (x, y, size) => {
+  const generator = rough.svg(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
+  return [generator.path(
+    `M ${x - size * 0.3} ${y - size * 0.35}
+     L ${x + size * 0.2} ${y - size * 0.35}
+     L ${x + size * 0.4} ${y}
+     L ${x + size * 0.2} ${y + size * 0.35}
+     L ${x - size * 0.3} ${y + size * 0.35}
+     Z`,
+    {
+      stroke: getStrokeColor('#3498db'),   // 蓝色描边
       strokeWidth: 2,
       fill: 'none',
-      roughness: 1.2
-    })]
-  }
+      roughness: 1.5
+    }
+  )]
+}
 }
 
 // ========== 方法 ==========
@@ -172,6 +208,9 @@ onMounted(drawIcon)
 
 // 监听图标类型变化，重新绘制
 watch(() => props.type, drawIcon)
+
+// 监听主题变化，重新绘制
+watch(() => themeStore.isDark, drawIcon)
 </script>
 
 <style scoped>

@@ -158,6 +158,6 @@ watch(
 <style scoped>
 .hand-drawn-border {
   position: relative;
-  background: #fff;
+  background: var(--card-bg);
 }
 </style>

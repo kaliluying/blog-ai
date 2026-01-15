@@ -64,13 +64,16 @@
               <div class="article-content" ref="contentRef" v-html="safeContent"></div>
             </HandDrawnCard>
 
+            <RelatedPosts v-if="post && post.tags && post.tags.length > 0" :post-id="post.id" :tags="post.tags" />
+
             <!-- 评论区域 -->
             <CommentSection :post-id="postId" :comments="comments" @refresh="fetchComments" />
           </div>
 
-          <!-- 右侧：目录 -->
+          <!-- 右侧：目录和侧边栏 -->
           <aside class="article-sidebar">
             <TableOfContents :headings="headings" :active-id="activeHeadingId" @select="scrollToHeading" />
+            <ArticleSidebar :tags="post?.tags || []" />
           </aside>
         </div>
       </template>
@@ -116,6 +119,12 @@ import CommentSection from '@/components/CommentSection.vue'
 
 // 导入目录组件
 import TableOfContents from '@/components/TableOfContents.vue'
+
+// 导入相关文章组件
+import RelatedPosts from '@/components/RelatedPosts.vue'
+
+// 导入侧边栏组件
+import ArticleSidebar from '@/components/ArticleSidebar.vue'
 
 // ========== 组件配置 ==========
 
@@ -409,13 +418,18 @@ onUnmounted(() => {
 
 .article-sidebar {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 260px;
+  flex-shrink: 0;
 }
 
 .article-card {
   width: 100%;
 }
 
-/* 响应式：小屏幕隐藏 TOC */
+/* 响应式：小屏幕隐藏侧边栏 */
 @media (max-width: 1024px) {
   .article-layout {
     grid-template-columns: 1fr;
@@ -445,7 +459,7 @@ onUnmounted(() => {
 .article-title {
   font-family: 'Caveat', cursive;
   font-size: 2.5rem;
-  color: #2c3e50;
+  color: var(--text-primary);
   margin: 16px 0 16px 0;
   padding: 0 60px;
 }
@@ -459,17 +473,17 @@ onUnmounted(() => {
 }
 
 .article-date {
-  color: #7f8c8d;
+  color: var(--text-secondary);
 }
 
 .article-views {
-  color: #95a5a6;
+  color: var(--text-secondary);
 }
 
 .article-content {
   padding: 20px 0;
   line-height: 1.8;
-  color: #34495e;
+  color: var(--text-primary);
   font-size: 1.1rem;
 }
 
@@ -481,11 +495,11 @@ onUnmounted(() => {
 .article-content :deep(h2),
 .article-content :deep(h3) {
   margin: 24px 0 12px;
-  color: #2c3e50;
+  color: var(--text-primary);
 }
 
 .article-content :deep(pre) {
-  background: #f5f5f5;
+  background: var(--code-bg);
   padding: 16px;
   border-radius: 8px;
   overflow-x: auto;
@@ -493,7 +507,7 @@ onUnmounted(() => {
 }
 
 .article-content :deep(code) {
-  background: #f5f5f5;
+  background: var(--code-bg);
   padding: 2px 6px;
   border-radius: 4px;
   font-family: 'Fira Code', 'Consolas', monospace;
@@ -509,8 +523,8 @@ onUnmounted(() => {
   margin: 16px 0;
   padding: 8px 16px;
   border-left: 4px solid #3498db;
-  background: #f8f8f8;
-  color: #666;
+  background: var(--blockquote-bg);
+  color: var(--text-secondary);
 }
 
 .article-content :deep(li) {
@@ -519,7 +533,7 @@ onUnmounted(() => {
 }
 
 .article-content :deep(del) {
-  color: #999;
+  color: var(--text-secondary);
 }
 
 .article-content :deep(a) {
@@ -549,13 +563,13 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #666;
+  color: var(--text-secondary);
   transition: all 0.2s;
 }
 
 .article-content :deep(pre .copy-btn:hover) {
   background: rgba(0, 0, 0, 0.1);
-  color: #333;
+  color: var(--text-primary);
 }
 
 .article-content :deep(pre .copy-btn.copied) {

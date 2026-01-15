@@ -243,6 +243,16 @@ export const blogApi = {
   searchPosts: async (query: string): Promise<BlogPost[]> => {
     return api.get('/api/search', { params: { q: query } })
   },
+
+  /**
+   * 获取相关文章推荐
+   * @param postId 当前文章 ID
+   * @param limit 返回数量，默认 5
+   * @returns Promise<BlogPost[]> 相关文章列表
+   */
+  getRelatedPosts: async (postId: number, limit: number = 5): Promise<BlogPost[]> => {
+    return api.get(`/api/posts/${postId}/related`, { params: { limit } })
+  },
 }
 
 // ========== 评论 API ==========

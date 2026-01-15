@@ -49,7 +49,7 @@ defineProps<{
 
 <style scoped>
 .hand-drawn-card {
-  margin: 16px;
+  margin: 0;
   transition: transform 0.2s ease;
 }
 
@@ -59,7 +59,8 @@ defineProps<{
 
 .card-content {
   padding: 16px;
-  background: #fff;
+  background: var(--card-bg);
+  color: var(--text-primary);
 }
 
 .card-header {
@@ -70,6 +71,11 @@ defineProps<{
   margin: 0 0 8px 0;
   font-family: 'Caveat', cursive;
   font-size: 1.5rem;
-  color: #2c3e50;
+  color: var(--text-primary);
+}
+
+/* 暗黑模式下的边框颜色 */
+:deep(.hand-drawn-border) {
+  --border-color: var(--border-color);
 }
 </style>

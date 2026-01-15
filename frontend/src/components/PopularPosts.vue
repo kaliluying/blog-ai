@@ -76,7 +76,7 @@ const readMore = (id: number) => {
   gap: 8px;
   font-family: 'Caveat', cursive;
   font-size: 1.5rem;
-  color: #2c3e50;
+  color: var(--text-primary);
   margin: 0 0 16px 0;
 }
 
@@ -86,7 +86,7 @@ const readMore = (id: number) => {
 }
 
 .empty-text {
-  color: #7f8c8d;
+  color: var(--text-secondary);
   text-align: center;
   margin: 0;
   padding: 20px 0;
@@ -103,7 +103,7 @@ const readMore = (id: number) => {
   align-items: center;
   gap: 12px;
   padding: 12px 0;
-  border-bottom: 1px dashed #e0e0e0;
+  border-bottom: 1px dashed var(--border-color);
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -122,11 +122,11 @@ const readMore = (id: number) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f5f5f5;
+  background: var(--code-bg);
   border-radius: 50%;
   font-size: 0.8rem;
   font-weight: bold;
-  color: #7f8c8d;
+  color: var(--text-secondary);
   flex-shrink: 0;
 }
 
@@ -156,7 +156,7 @@ const readMore = (id: number) => {
 
 .popular-post-title {
   font-size: 0.9rem;
-  color: #34495e;
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -164,6 +164,6 @@ const readMore = (id: number) => {
 
 .popular-post-views {
   font-size: 0.75rem;
-  color: #95a5a6;
+  color: var(--text-secondary);
 }
 </style>

@@ -82,6 +82,7 @@ from crud import (
     get_popular_posts,
     get_post_view_count,
     check_post_title_exists,
+    get_related_posts,
 )
 
 from contextlib import asynccontextmanager
@@ -556,6 +557,36 @@ async def get_post(post_id: int, db: AsyncSession = Depends(get_db)):
     if post is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文章不存在")
     return post_to_dict(post)
+
+
+@app.get("/api/posts/{post_id}/related")
+async def get_related_posts_route(
+    post_id: int,
+    limit: int = 5,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取相关文章推荐
+
+    Path Parameters:
+        post_id: 当前文章 ID
+
+    Query Parameters:
+        limit: 返回数量限制，默认 5
+
+    Returns:
+        List[dict]: 相关文章列表
+    """
+    post = await get_post_by_id(db, post_id)
+    if post is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文章不存在")
+
+    tags = parse_post_tags(post)
+    if not tags:
+        return []
+
+    related = await get_related_posts(db, post_id, tags, limit)
+    return [post_to_list_item(p) for p in related]
 
 
 @app.post("/api/posts/{post_id}/view")

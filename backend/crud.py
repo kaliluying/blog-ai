@@ -15,6 +15,7 @@
 """
 
 # 标准库导入
+import json
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
@@ -490,6 +491,53 @@ async def get_popular_posts(db: AsyncSession, limit: int = 5) -> List[BlogPost]:
         .limit(limit)
     )
     return result.scalars().all()
+
+
+async def get_related_posts(
+    db: AsyncSession,
+    post_id: int,
+    tags: List[str],
+    limit: int = 5
+) -> List[BlogPost]:
+    """
+    获取相关文章推荐
+
+    基于标签匹配查找相关文章，按匹配数和阅读量排序。
+
+    Args:
+        db: 数据库会话
+        post_id: 当前文章 ID（排除）
+        tags: 当前文章的标签列表
+        limit: 返回数量限制
+
+    Returns:
+        List[BlogPost]: 相关文章列表
+    """
+    if not tags:
+        return []
+
+    # 构建标签匹配条件 - 使用 jsonb_exists 并确保类型转换兼容
+    tag_conditions = []
+    params = {"post_id": post_id, "limit": limit}
+    for i, tag in enumerate(tags[:5]):
+        tag_conditions.append(f"jsonb_exists(p.tags::jsonb, :tag{i})")
+        params[f"tag{i}"] = tag
+
+    # 使用子查询避免 GROUP BY 问题
+    result = await db.execute(
+        text(f"""
+            SELECT p.*
+            FROM blog_posts p
+            WHERE p.id != :post_id
+            AND ({' OR '.join(tag_conditions)})
+            ORDER BY p.view_count DESC
+            LIMIT :limit
+        """),
+        params
+    )
+
+    rows = result.fetchall()
+    return [row[0] for row in rows] if rows else []
 
 
 async def cleanup_expired_view_records(db: AsyncSession, days: int = 30) -> int:

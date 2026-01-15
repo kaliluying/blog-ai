@@ -9,48 +9,30 @@
 -->
 
 <template>
-  <!--
-    n-config-provider: Naive UI 全局配置提供者
-    theme-overrides: 自定义主题覆盖色和样式
-  -->
-  <n-config-provider :theme-overrides="themeOverrides">
+  <n-config-provider :theme-overrides="themeOverrides" :theme="naiveTheme">
 
-    <!-- n-message-provider: 全局消息通知提供者 -->
     <n-message-provider>
-      <!-- n-notification-provider: 全局通知提供者 -->
       <n-notification-provider>
-        <!-- n-dialog-provider: 全局对话框提供者 -->
         <n-dialog-provider>
-          <!-- n-loading-bar-provider: 全局加载进度条提供者 -->
           <n-loading-bar-provider>
 
-            <!-- 页面主布局容器 -->
             <div class="blog-layout">
 
-              <!-- 顶部头部区域 -->
               <header class="header">
                 <div class="header-content">
-                  <!-- Logo 和站点名称（链接到首页） -->
                   <router-link to="/" class="logo">
                     <HandDrawnIcon type="star" :size="28" />
                     <span>手绘博客</span>
                   </router-link>
 
-                  <!-- 搜索框 -->
                   <div class="search-box">
-                    <n-input
-                      v-model:value="searchQuery"
-                      placeholder="搜索文章..."
-                      @keyup.enter="handleSearch"
-                      clearable
-                    >
+                    <n-input v-model:value="searchQuery" placeholder="搜索文章..." @keyup.enter="handleSearch" clearable>
                       <template #prefix>
                         <n-icon :component="SearchIcon" />
                       </template>
                     </n-input>
                   </div>
 
-                  <!-- 导航菜单 -->
                   <nav class="nav">
                     <router-link to="/" class="nav-link">首页</router-link>
                     <template v-if="authStore.isLoggedIn">
@@ -63,6 +45,11 @@
                       <router-link to="/admin/posts" class="nav-link">管理</router-link>
                     </template>
                     <router-link to="/about" class="nav-link">关于</router-link>
+                    <n-button quaternary circle @click="handleThemeToggle" class="theme-toggle">
+                      <template #icon>
+                        <n-icon :component="themeIcon" />
+                      </template>
+                    </n-button>
                   </nav>
                 </div>
               </header>
@@ -91,12 +78,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, h } from 'vue'
+import { ref, h, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { NIcon, type GlobalThemeOverrides } from 'naive-ui'
+import { NIcon, type GlobalThemeOverrides, darkTheme } from 'naive-ui'
 
 import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useThemeStore } from '@/stores/theme'
 
 // SVG 图标组件
 const SearchIcon = {
@@ -124,20 +112,6 @@ const SearchIcon = {
         'stroke-width': '32',
         d: 'M338.29 338.29L448 448'
       })
-    ])
-  }
-}
-
-const UserIcon = {
-  render() {
-    return h('svg', {
-      xmlns: 'http://www.w3.org/2000/svg',
-      viewBox: '0 0 24 24',
-      width: 16,
-      height: 16,
-      fill: 'currentColor'
-    }, [
-      h('path', { d: 'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z' })
     ])
   }
 }
@@ -172,8 +146,52 @@ const LogoutIcon = {
 
 const router = useRouter()
 const authStore = useAuthStore()
+const themeStore = useThemeStore()
 
 const searchQuery = ref('')
+
+const themeIcon = computed(() => {
+  switch (themeStore.theme) {
+    case 'light':
+      return {
+        render() {
+          return h('svg', { xmlns: 'http://www.w3.org/2000/svg', viewBox: '0 0 24 24', width: 18, height: 18, fill: 'currentColor' }, [
+            h('circle', { cx: '12', cy: '12', r: '5' }),
+            h('line', { x1: '12', y1: '1', x2: '12', y2: '3', stroke: 'currentColor', 'stroke-width': '2' }),
+            h('line', { x1: '12', y1: '21', x2: '12', y2: '23', stroke: 'currentColor', 'stroke-width': '2' }),
+            h('line', { x1: '4.22', y1: '4.22', x2: '5.64', y2: '5.64', stroke: 'currentColor', 'stroke-width': '2' }),
+            h('line', { x1: '18.36', y1: '18.36', x2: '19.78', y2: '19.78', stroke: 'currentColor', 'stroke-width': '2' }),
+            h('line', { x1: '1', y1: '12', x2: '3', y2: '12', stroke: 'currentColor', 'stroke-width': '2' }),
+            h('line', { x1: '21', y1: '12', x2: '23', y2: '12', stroke: 'currentColor', 'stroke-width': '2' }),
+            h('line', { x1: '4.22', y1: '19.78', x2: '5.64', y2: '18.36', stroke: 'currentColor', 'stroke-width': '2' }),
+            h('line', { x1: '18.36', y1: '5.64', x2: '19.78', y2: '4.22', stroke: 'currentColor', 'stroke-width': '2' })
+          ])
+        }
+      }
+    case 'dark':
+      return {
+        render() {
+          return h('svg', { xmlns: 'http://www.w3.org/2000/svg', viewBox: '0 0 24 24', width: 18, height: 18, fill: 'currentColor' }, [
+            h('path', { d: 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z' })
+          ])
+        }
+      }
+    default:
+      return {
+        render() {
+          return h('svg', { xmlns: 'http://www.w3.org/2000/svg', viewBox: '0 0 24 24', width: 18, height: 18, fill: 'currentColor' }, [
+            h('rect', { x: '2', y: '3', width: '20', height: '14', rx: '2', ry: '2' }),
+            h('line', { x1: '8', y1: '21', x2: '16', y2: '21', stroke: 'currentColor', 'stroke-width': '2' }),
+            h('line', { x1: '12', y1: '17', x2: '12', y2: '21', stroke: 'currentColor', 'stroke-width': '2' })
+          ])
+        }
+      }
+  }
+})
+
+const handleThemeToggle = () => {
+  themeStore.toggleTheme()
+}
 
 // 博主管理菜单选项
 const adminMenuOptions = [
@@ -214,40 +232,60 @@ const handleSearch = () => {
  * 自定义 Naive UI 的默认主题色、字体和圆角等样式
  */
 const themeOverrides: GlobalThemeOverrides = {
-  // 通用颜色配置
   common: {
-    primaryColor: '#34495e',        // 主色调：深蓝灰色
-    primaryColorHover: '#5d6d7e',   // 主色悬停状态
-    primaryColorPressed: '#2c3e50', // 主色按下状态
-    borderRadius: '3px',            // 默认圆角
-    // 自定义字体：使用手写风格字体
+    primaryColor: '#34495e',
+    primaryColorHover: '#5d6d7e',
+    primaryColorPressed: '#2c3e50',
+    borderRadius: '3px',
     fontFamily: '"Caveat", "Comic Sans MS", cursive, sans-serif',
     fontFamilyMono: '"Courier New", monospace'
   },
-  // 按钮组件样式覆盖
   Button: {
-    borderRadiusMedium: '8px 8px 4px 4px',  // 中号按钮圆角（手绘风格不等边）
-    borderRadiusSmall: '6px 6px 3px 3px',  // 小号按钮圆角
-    fontWeight: '600'                       // 字体加粗
+    borderRadiusMedium: '8px 8px 4px 4px',
+    borderRadiusSmall: '6px 6px 3px 3px',
+    fontWeight: '600'
   },
-  // 卡片组件样式覆盖
   Card: {
-    borderRadius: '12px 12px 8px 8px',  // 卡片圆角
-    boxShadow: '2px 2px 0 #34495e'      // 卡片阴影（手绘风格硬阴影）
+    borderRadius: '12px 12px 8px 8px',
+    boxShadow: '2px 2px 0 #34495e'
   },
-  // 输入框组件样式覆盖
   Input: {
-    borderRadius: '6px 6px 3px 3px'  // 输入框圆角
+    borderRadius: '6px 6px 3px 3px'
   },
-  // 标签组件样式覆盖
   Tag: {
-    borderRadius: '4px 4px 2px 2px'  // 标签圆角
+    borderRadius: '4px 4px 2px 2px'
   }
 }
+
+const naiveTheme = computed(() => themeStore.isDark ? darkTheme : null)
 </script>
 
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap');
+
+:root {
+  --bg-primary: #fefefe;
+  --bg-secondary: #f5f5dc;
+  --text-primary: #2c3e50;
+  --text-secondary: #7f8c8d;
+  --border-color: #34495e;
+  --card-bg: #ffffff;
+  --shadow-color: #34495e;
+  --code-bg: #f5f5f5;
+  --blockquote-bg: #f8f8f8;
+}
+
+html.dark {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --text-primary: #e4e4e7;
+  --text-secondary: #a1a1aa;
+  --border-color: #4a5568;
+  --card-bg: #1e293b;
+  --shadow-color: #0f172a;
+  --code-bg: #0d1117;
+  --blockquote-bg: #1e293b;
+}
 
 * {
   box-sizing: border-box;
@@ -256,18 +294,21 @@ const themeOverrides: GlobalThemeOverrides = {
 body {
   margin: 0;
   padding: 0;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .blog-layout {
   min-height: 100vh;
-  background: linear-gradient(135deg, #fefefe 0%, #f5f5dc 100%);
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  transition: background 0.3s ease;
 }
 
 .header {
-  background: #fff;
-  border-bottom: 2px solid #34495e;
+  background: var(--card-bg);
+  border-bottom: 2px solid var(--border-color);
   position: relative;
   z-index: 10;
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 .header-content {
@@ -285,11 +326,12 @@ body {
   align-items: center;
   gap: 8px;
   text-decoration: none;
-  color: #2c3e50;
+  color: var(--text-primary);
   font-family: 'Caveat', cursive;
   font-size: 1.5rem;
   font-weight: 700;
   flex-shrink: 0;
+  transition: color 0.3s ease;
 }
 
 .search-box {
@@ -305,7 +347,7 @@ body {
 
 .nav-link {
   text-decoration: none;
-  color: #34495e;
+  color: var(--text-primary);
   font-size: 1.1rem;
   font-weight: 600;
   transition: color 0.2s;
@@ -317,11 +359,15 @@ body {
 }
 
 .nav-link.router-link-active {
-  color: #2c3e50;
+  color: var(--text-primary);
 }
 
 .user-name {
   cursor: pointer;
+}
+
+.theme-toggle {
+  margin-left: 8px;
 }
 
 .main-content {
@@ -329,12 +375,13 @@ body {
 }
 
 .footer {
-  background: #34495e;
-  color: #fff;
+  background: var(--border-color);
+  color: var(--bg-primary);
   text-align: center;
   padding: 20px;
   position: relative;
   z-index: 10;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 .footer p {
@@ -351,5 +398,23 @@ body {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+html.dark .footer {
+  background: var(--shadow-color);
+}
+
+html.dark .nav-link:hover {
+  color: #94a3b8;
+}
+
+html.dark .article-content :deep(pre .copy-btn) {
+  background: rgba(255, 255, 255, 0.1);
+  color: #a1a1aa;
+}
+
+html.dark .article-content :deep(pre .copy-btn:hover) {
+  background: rgba(255, 255, 255, 0.2);
+  color: #e4e4e7;
 }
 </style>

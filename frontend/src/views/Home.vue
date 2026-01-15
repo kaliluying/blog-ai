@@ -67,15 +67,9 @@
 
           <!-- 分页 -->
           <div v-if="totalCount > pageSize" class="pagination-wrapper">
-            <n-pagination
-              v-model:page="currentPage"
-              :page-count="Math.ceil(totalCount / pageSize)"
-              :page-sizes="[5, 10, 20]"
-              :page-size="pageSize"
-              show-size-picker
-              @update:page="handlePageChange"
-              @update:page-size="handlePageSizeChange"
-            />
+            <n-pagination v-model:page="currentPage" :page-count="Math.ceil(totalCount / pageSize)"
+              :page-sizes="[5, 10, 20]" :page-size="pageSize" show-size-picker @update:page="handlePageChange"
+              @update:page-size="handlePageSizeChange" />
           </div>
         </section>
       </section>
@@ -91,7 +85,7 @@
             </div>
             <div class="author-detail">
               <h3 class="author-name">博主大大</h3>
-              <p class="author-bio">热爱编程与绘画，专注于全栈开发</p>
+              <p class="author-bio">热爱编程，专注于AI全栈开发</p>
               <!-- 社交链接 -->
               <div class="social-links">
                 <a href="https://github.com/kaliluying" target="_blank" class="social-link" title="GitHub">
@@ -352,13 +346,13 @@ const goToTag = (tag: string) => {
 .hero-title {
   font-family: 'Caveat', cursive;
   font-size: 2.5rem;
-  color: #2c3e50;
+  color: var(--text-primary);
   margin: 0 0 12px 0;
 }
 
 .hero-subtitle {
   font-size: 1.1rem;
-  color: #7f8c8d;
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -372,7 +366,7 @@ const goToTag = (tag: string) => {
   gap: 12px;
   font-family: 'Caveat', cursive;
   font-size: 2rem;
-  color: #2c3e50;
+  color: var(--text-primary);
   margin-bottom: 24px;
 }
 
@@ -396,17 +390,17 @@ const goToTag = (tag: string) => {
 
 .post-date {
   font-size: 0.85rem;
-  color: #7f8c8d;
+  color: var(--text-secondary);
   margin-left: auto;
 }
 
 .post-views {
   font-size: 0.85rem;
-  color: #95a5a6;
+  color: var(--text-secondary);
 }
 
 .post-excerpt {
-  color: #5d6d7e;
+  color: var(--text-primary);
   line-height: 1.6;
   margin-bottom: 16px;
 }
@@ -415,7 +409,7 @@ const goToTag = (tag: string) => {
 .empty-state {
   text-align: center;
   padding: 40px;
-  color: #7f8c8d;
+  color: var(--text-secondary);
 }
 
 .loading-state p,
@@ -441,7 +435,7 @@ const goToTag = (tag: string) => {
   gap: 8px;
   font-family: 'Caveat', cursive;
   font-size: 1.5rem;
-  color: #2c3e50;
+  color: var(--text-primary);
   margin: 0 0 16px 0;
 }
 
@@ -455,7 +449,7 @@ const goToTag = (tag: string) => {
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: #f5f5f5;
+  background: var(--code-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -464,13 +458,13 @@ const goToTag = (tag: string) => {
 
 .author-name {
   font-size: 1.1rem;
-  color: #2c3e50;
+  color: var(--text-primary);
   margin: 0 0 4px 0;
 }
 
 .author-bio {
   font-size: 0.85rem;
-  color: #7f8c8d;
+  color: var(--text-secondary);
   margin: 0 0 12px 0;
   line-height: 1.4;
 }
@@ -487,14 +481,14 @@ const goToTag = (tag: string) => {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #f5f5f5;
-  color: #666;
+  background: var(--code-bg);
+  color: var(--text-secondary);
   transition: all 0.2s;
 }
 
 .social-link:hover {
-  background: #34495e;
-  color: #fff;
+  background: var(--border-color);
+  color: var(--bg-primary);
   transform: translateY(-2px);
 }
 
@@ -513,24 +507,25 @@ const goToTag = (tag: string) => {
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;
-  background: #f8f8f8;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
 }
 
 .stat-label {
-  color: #7f8c8d;
+  color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
 .stat-value {
   font-family: 'Caveat', cursive;
   font-size: 1.3rem;
-  color: #2c3e50;
+  color: var(--text-primary);
   font-weight: bold;
 }
 
 .notice-text {
-  color: #5d6d7e;
+  color: var(--text-secondary);
   line-height: 1.6;
   margin: 0;
   font-size: 0.9rem;
@@ -562,7 +557,7 @@ const goToTag = (tag: string) => {
   justify-content: space-between;
   align-items: center;
   padding: 10px 0;
-  border-bottom: 1px dashed #e0e0e0;
+  border-bottom: 1px dashed var(--border-color);
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -578,7 +573,7 @@ const goToTag = (tag: string) => {
 .recent-post-title {
   flex: 1;
   font-size: 0.9rem;
-  color: #34495e;
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -586,7 +581,7 @@ const goToTag = (tag: string) => {
 
 .recent-post-date {
   font-size: 0.8rem;
-  color: #95a5a6;
+  color: var(--text-secondary);
   margin-left: 12px;
   flex-shrink: 0;
 }
@@ -612,7 +607,7 @@ const goToTag = (tag: string) => {
 
 .archive-link {
   font-size: 0.9rem;
-  color: #34495e;
+  color: var(--text-primary);
 }
 
 .archive-item:hover .archive-link {
@@ -620,7 +615,7 @@ const goToTag = (tag: string) => {
 }
 
 .about-text {
-  color: #5d6d7e;
+  color: var(--text-secondary);
   line-height: 1.6;
   margin: 0;
   font-size: 0.95rem;

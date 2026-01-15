@@ -55,20 +55,19 @@ const scrollTo = (id: string) => {
 .toc-container {
   position: sticky;
   top: 100px;
-  max-height: calc(100vh - 140px);
   overflow-y: auto;
 }
 
 .toc-card {
+  width: 100%;
   padding: 16px;
-  min-width: 200px;
 }
 
 .toc-title {
   margin: 0 0 12px;
   font-family: 'Caveat', cursive;
   font-size: 1.5rem;
-  color: #2c3e50;
+  color: var(--text-primary);
   font-weight: normal;
 }
 
@@ -81,7 +80,7 @@ const scrollTo = (id: string) => {
 .toc-item {
   padding: 6px 12px;
   margin: 4px 0;
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.95rem;
   cursor: pointer;
   border-left: 3px solid transparent;
