@@ -83,7 +83,7 @@ import { useRouter } from 'vue-router'
 import { NIcon, type GlobalThemeOverrides, darkTheme } from 'naive-ui'
 
 import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
-import { SearchIcon, WriteIcon, LogoutIcon, SunIcon, MoonIcon, SystemIcon } from '@/components/icons'
+import { SearchIcon, WriteIcon, LogoutIcon, SunIcon, MoonIcon } from '@/components/icons'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 
@@ -94,11 +94,7 @@ const themeStore = useThemeStore()
 const searchQuery = ref('')
 
 const themeIcon = computed(() => {
-  switch (themeStore.theme) {
-    case 'light': return SunIcon
-    case 'dark': return MoonIcon
-    default: return SystemIcon
-  }
+  return themeStore.isDark ? MoonIcon : SunIcon
 })
 
 const handleThemeToggle = () => {

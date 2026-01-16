@@ -126,6 +126,9 @@ import RelatedPosts from '@/components/RelatedPosts.vue'
 // 导入侧边栏组件
 import ArticleSidebar from '@/components/ArticleSidebar.vue'
 
+// 导入代码复制 Composable
+import { useCodeCopy } from '@/composables/useCodeCopy'
+
 // ========== 组件配置 ==========
 
 defineOptions({
@@ -145,6 +148,9 @@ const message = useMessage()
 
 // 博客 Store 实例（用于记录浏览）
 const blogStore = useBlogStore()
+
+// 代码复制 Composable 实例
+const { setupCopyButtons, cleanupCopyButtons } = useCodeCopy()
 
 // ========== 响应式状态 ==========
 
@@ -280,7 +286,7 @@ const fetchPost = async () => {
     await nextTick()
     // 延迟一下确保 v-html 完全渲染
     setTimeout(() => {
-      setupCopyButtons()
+      setupCopyButtons(contentRef.value!)
       extractHeadings()
       setupScrollObserver()
     }, 50)
@@ -308,70 +314,6 @@ const fetchPost = async () => {
  */
 const safeContent = computed(() => renderMarkdownWithCodeSafe(post.value?.content || ''))
 
-/**
- * 为代码块添加复制按钮
- * 在 DOM 更新后调用，为所有代码块添加复制功能
- */
-const setupCopyButtons = () => {
-  if (!contentRef.value) return
-
-  // 获取所有代码块
-  const preList = contentRef.value.querySelectorAll('pre.code-block')
-  preList.forEach((pre) => {
-    // 移除已存在的复制按钮（确保重新创建）
-    const existingBtn = pre.querySelector('.copy-btn')
-    if (existingBtn) {
-      existingBtn.remove()
-    }
-
-    // 从 data 属性中获取 base64 编码的代码
-    const encodedCode = (pre as HTMLElement).dataset.code || ''
-    // 解码 base64
-    const code = decodeCode(encodedCode)
-
-    // 创建复制按钮
-    const btn = document.createElement('button')
-    btn.className = 'copy-btn'
-    // SVG 图标：复制图标
-    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>'
-    btn.title = '复制代码'
-
-    // 点击复制事件
-    const handleClick = async () => {
-      try {
-        // 使用 Clipboard API 复制代码
-        await navigator.clipboard.writeText(code)
-        btn.classList.add('copied')
-        // 切换为勾号图标
-        btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>'
-        message.success('已复制')
-        // 2 秒后恢复原图标
-        setTimeout(() => {
-          btn.classList.remove('copied')
-          btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>'
-        }, 2000)
-      } catch {
-        message.error('复制失败')
-      }
-    }
-
-    btn.addEventListener('click', handleClick)
-
-    // 将按钮添加到代码块
-    pre.appendChild(btn)
-  })
-}
-
-/**
- * 清理复制按钮
- * 在组件卸载时移除所有复制按钮
- */
-const cleanupCopyButtons = () => {
-  if (!contentRef.value) return
-  const btnList = contentRef.value.querySelectorAll('pre .copy-btn')
-  btnList.forEach((btn) => btn.remove())
-}
-
 // ========== 生命周期 ==========
 
 // 组件挂载时获取文章
@@ -387,7 +329,9 @@ watch(() => route.params.id, async () => {
 
 // 组件卸载时清理，防止内存泄漏
 onUnmounted(() => {
-  cleanupCopyButtons()
+  if (contentRef.value) {
+    cleanupCopyButtons(contentRef.value)
+  }
   cleanupScrollObserver()
 })
 </script>
@@ -427,6 +371,13 @@ onUnmounted(() => {
   align-self: flex-start;
   max-height: calc(100vh - 140px);
   overflow-y: auto;
+  /* 隐藏滚动条但保持滚动 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.article-sidebar::-webkit-scrollbar {
+  display: none;
 }
 
 .article-card {

@@ -1,3 +1,14 @@
+<!--
+  CommentSection.vue - 评论组件
+
+  本组件提供文章评论功能，支持：
+  1. 匿名评论（无需登录）
+  2. 多层级回复（支持二级回复）
+  3. 昵称自动生成与本地存储
+  4. 管理员删除评论
+  5. 评论刷新与实时更新
+-->
+
 <template>
   <div class="comment-section">
     <h3 class="comment-title">
@@ -124,32 +135,85 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 评论组件脚本部分
+ *
+ * 包含：
+ * - 组件属性定义（父组件传递的数据）
+ * - 事件定义（向父组件发送的事件）
+ * - 评论相关状态管理
+ * - 评论操作方法
+ */
+
+// 从 vue 导入 Composition API 工具
 import { ref, onMounted, computed } from 'vue'
+
+// 从 naive-ui 导入消息提示
 import { useMessage } from 'naive-ui'
+
+// 从 stores 导入认证状态管理
 import { useAdminStore } from '@/stores/auth'
+
+// 从 api 导入评论 API 和类型定义
 import { commentApi, type Comment } from '@/api'
+
+// 导入手绘风格图标组件
 import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
+
+// 导入日期格式化工具
 import { formatDate } from '@/utils/date'
 
+// ========== 组件接口定义 ==========
+
+/**
+ * 组件属性
+ */
 const props = defineProps<{
-  postId: number
-  comments: Comment[]
+  postId: number      // 文章 ID（必填）
+  comments: Comment[] // 评论列表（从父组件传入）
 }>()
 
+/**
+ * 组件事件
+ */
 const emit = defineEmits<{
-  (e: 'refresh'): void
+  (e: 'refresh'): void  // 刷新评论列表事件
 }>()
 
+// ========== 组合式函数 ==========
+
+// 消息提示实例
 const message = useMessage()
+
+// 认证 Store 实例（用于判断是否为管理员）
 const adminStore = useAdminStore()
 
+// ========== 响应式状态 ==========
+
+// 新评论内容
 const newComment = ref('')
+
+// 评论者昵称
 const nickname = ref('')
+
+// 回复内容
 const replyContent = ref('')
+
+// 当前回复的目标评论 ID
 const replyingTo = ref<number | null>(null)
+
+// 当前回复的父评论 ID（用于嵌套回复）
 const replyingToParent = ref<number | null>(null)
+
+// 提交状态（控制按钮 loading）
 const submitting = ref(false)
 
+// ========== 常量定义 ==========
+
+/**
+ * 随机昵称列表
+ * 用于匿名用户自动生成昵称
+ */
 const randomNicknames = [
   '好奇的猫咪', '爱思考的云朵', '路过的旅人', '安静的观察者',
   '快乐的星星', '温柔的微风', '勇敢的小鸟', '智慧的树洞',
@@ -158,42 +222,88 @@ const randomNicknames = [
   '沉稳的大象', '灵动的蝴蝶', '坚定的山峰', '清澈的溪流'
 ]
 
+// ========== 计算属性 ==========
+
+/**
+ * 是否可以提交新评论
+ * 条件：评论内容和昵称都不为空
+ */
+const canSubmit = computed(() => {
+  return newComment.value.trim() && nickname.value.trim()
+})
+
+/**
+ * 是否可以提交回复
+ * 条件：回复内容不为空
+ */
+const canReplySubmit = computed(() => {
+  return replyContent.value.trim()
+})
+
+// ========== 方法定义 ==========
+
+/**
+ * 生成随机昵称
+ * 从预设列表中随机选择一个，并加上随机数字后缀
+ *
+ * @returns 生成的昵称字符串
+ */
 const generateNickname = () => {
   const randomIndex = Math.floor(Math.random() * randomNicknames.length)
   const randomNum = Math.floor(Math.random() * 1000)
   return `${randomNicknames[randomIndex]}${randomNum}`
 }
 
+/**
+ * 重新生成昵称
+ * 并保存到本地存储，显示提示信息
+ */
 const regenerateNickname = () => {
   nickname.value = generateNickname()
   saveNickname(nickname.value)
   message.info('已生成新昵称')
 }
 
+/**
+ * 保存昵称到本地存储
+ *
+ * @param nick 要保存的昵称
+ */
 const saveNickname = (nick: string) => {
   localStorage.setItem('commentNickname', nick)
 }
 
-const canSubmit = computed(() => {
-  return newComment.value.trim() && nickname.value.trim()
-})
-
-const canReplySubmit = computed(() => {
-  return replyContent.value.trim()
-})
-
+/**
+ * 显示回复表单
+ *
+ * @param commentId 要回复的评论 ID
+ * @param parentId 父评论 ID（可选，用于嵌套回复）
+ */
 const showReplyForm = (commentId: number, parentId?: number) => {
   replyingTo.value = commentId
   replyingToParent.value = parentId || null
   replyContent.value = ''
 }
 
+/**
+ * 取消回复
+ * 清空回复状态和内容
+ */
 const cancelReply = () => {
   replyingTo.value = null
   replyingToParent.value = null
   replyContent.value = ''
 }
 
+/**
+ * 提交新评论
+ *
+ * 流程：
+ * 1. 验证表单数据
+ * 2. 调用 API 创建评论
+ * 3. 保存昵称到本地
+ * 4. 清空表单并触发刷新
+ */
 const handleSubmit = async () => {
   if (!canSubmit.value) return
 
@@ -204,9 +314,12 @@ const handleSubmit = async () => {
       nickname: nickname.value.trim(),
       content: newComment.value.trim()
     })
+    // 保存昵称以便下次使用
     saveNickname(nickname.value)
+    // 清空评论内容
     newComment.value = ''
     message.success('评论发布成功~')
+    // 通知父组件刷新评论列表
     emit('refresh')
   } catch {
     message.error('评论失败，请稍后重试')
@@ -215,6 +328,11 @@ const handleSubmit = async () => {
   }
 }
 
+/**
+ * 提交回复
+ *
+ * @param parentId 父评论 ID
+ */
 const handleReply = async (parentId: number) => {
   if (!canReplySubmit.value) return
 
@@ -226,6 +344,7 @@ const handleReply = async (parentId: number) => {
       content: replyContent.value.trim(),
       parent_id: parentId
     })
+    // 清空回复表单
     replyContent.value = ''
     replyingTo.value = null
     replyingToParent.value = null
@@ -238,6 +357,11 @@ const handleReply = async (parentId: number) => {
   }
 }
 
+/**
+ * 删除评论
+ *
+ * @param commentId 要删除的评论 ID
+ */
 const handleDelete = async (commentId: number) => {
   try {
     await commentApi.deleteComment(commentId)
@@ -248,6 +372,16 @@ const handleDelete = async (commentId: number) => {
   }
 }
 
+// ========== 生命周期 ==========
+
+/**
+ * 组件挂载时初始化
+ *
+ * 流程：
+ * 1. 初始化 auth store
+ * 2. 检查本地存储的昵称
+ * 3. 如果没有存储的昵称，生成并保存新昵称
+ */
 onMounted(async () => {
   if (!adminStore.initialized) {
     await adminStore.init()

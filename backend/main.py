@@ -104,6 +104,7 @@ async def lifespan(app: FastAPI):
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
 # 旧版固定 token（用于兼容旧版本前端）
+# TODO: 在前端升级后移除此兼容逻辑
 ADMIN_TOKEN = "blog-admin-token"
 
 # 有效的管理员 session tokens（内存存储，生产环境建议用 Redis）
@@ -124,6 +125,9 @@ async def get_current_admin(request: Request) -> bool:
     """
     验证管理员身份
     支持新版 session token 和旧版固定 token（向后兼容）
+
+    Note:
+        旧版固定 token 兼容将在后续版本移除
     """
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):

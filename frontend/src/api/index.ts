@@ -4,12 +4,24 @@
  * 本模块使用 Axios 封装了与后端 FastAPI 服务器的所有 HTTP 请求。
  * 包含：
  * 1. Axios 实例配置（基础 URL、超时、拦截器、认证）
- * 2. BlogPost 接口类型定义
- * 3. 博客文章相关的 API 方法
- * 4. 匿名评论 API 方法
+ * 2. 博客文章相关的 API 方法
+ * 3. 匿名评论 API 方法
  */
 
 import axios from 'axios'
+import type {
+  BlogPost,
+  BlogPostCreate,
+  BlogPostUpdate,
+  TitleCheckRequest,
+  TitleCheckResponse,
+  Comment,
+  CommentCreate,
+  ArchiveGroup,
+  ArchiveYear,
+  ViewCountResponse,
+  AdminLoginResponse,
+} from '@/types'
 
 /**
  * 创建 Axios 实例
@@ -35,14 +47,14 @@ const api = axios.create({
  * 请求拦截器 - 自动添加管理员 Token
  */
 api.interceptors.request.use(
-  (config) => {
+  (config: import('axios').InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('adminToken')
     if (token) {
       config.headers.set('Authorization', `Bearer ${token}`)
     }
     return config
   },
-  (error) => {
+  (error: unknown) => {
     return Promise.reject(error)
   },
 )
@@ -52,120 +64,23 @@ api.interceptors.request.use(
  *
  * 在请求响应后统一处理：
  * 1. 提取响应数据（response.data）
- * 2. 错误处理：静默处理 401（未授权），打印其他错误
+ * 2. 错误处理：静默处理 401（未授权），清除失效的 token，打印其他错误
  */
 api.interceptors.response.use(
   // 成功响应：直接返回 data 部分
-  (response) => response.data,
+  (response: import('axios').AxiosResponse) => response.data,
 
   // 错误响应
-  (error) => {
-    // 401 未授权是预期情况，不打印错误
-    if (error.response?.status === 401) {
-      return Promise.reject(error)
+  (error: unknown) => {
+    const axiosError = error as import('axios').AxiosError
+    // 401 未授权 - 清除失效的 token
+    if (axiosError.response?.status === 401) {
+      localStorage.removeItem('adminToken')
     }
     console.error('API Error:', error)
     return Promise.reject(error)
   },
 )
-
-// ========== 类型定义 ==========
-
-/**
- * 博客文章接口类型
- * 定义前后端交互的数据结构
- */
-export interface BlogPost {
-  id: number // 文章唯一标识
-  title: string // 文章标题
-  excerpt: string // 文章摘要
-  content: string // 文章内容（Markdown 格式）
-  date: string // 发布日期
-  tags: string[] // 标签数组
-  created_at: string // 创建时间
-  updated_at: string // 更新时间
-  view_count: number // 阅读量
-}
-
-/**
- * 创建文章请求类型
- */
-export interface BlogPostCreate {
-  title: string
-  excerpt: string
-  content: string
-  tags: string[]
-}
-
-/**
- * 更新文章请求类型
- */
-export interface BlogPostUpdate {
-  title?: string
-  excerpt?: string
-  content?: string
-  tags?: string[]
-}
-
-/**
- * 标题检查请求类型
- */
-export interface TitleCheckRequest {
-  title: string
-  excludeId?: number
-}
-
-/**
- * 标题检查响应类型
- */
-export interface TitleCheckResponse {
-  exists: boolean
-  message: string
-}
-
-/**
- * 匿名评论类型
- */
-export interface Comment {
-  id: number
-  post_id: number
-  nickname: string // 匿名评论者昵称
-  content: string
-  parent_id: number | null
-  created_at: string
-  updated_at: string
-  replies?: Comment[]
-}
-
-/**
- * 创建评论请求类型（匿名）
- */
-export interface CommentCreate {
-  post_id: number
-  nickname: string
-  content: string
-  parent_id?: number
-}
-
-/**
- * 归档分组接口
- */
-export interface ArchiveGroup {
-  year: number
-  month: number
-  month_name: string
-  post_count: number
-  posts: BlogPost[]
-}
-
-/**
- * 年度归档接口
- */
-export interface ArchiveYear {
-  year: number
-  post_count: number
-  months: ArchiveGroup[]
-}
 
 // ========== 博客 API ==========
 
@@ -315,30 +230,6 @@ export const archiveApi = {
   getArchiveByYearMonth: async (year: number, month: number): Promise<ArchiveGroup> => {
     return api.get(`/api/archive/${year}/${month}`)
   },
-}
-
-/**
- * 阅读量响应类型
- */
-export interface ViewCountResponse {
-  counted: boolean // 是否成功计数
-  view_count: number // 当前阅读量
-}
-
-/**
- * 管理员登录请求类型
- */
-export interface AdminLoginRequest {
-  password: string
-}
-
-/**
- * 管理员登录响应类型
- */
-export interface AdminLoginResponse {
-  success: boolean
-  message: string
-  token: string | null
 }
 
 // ========== 阅读量 API ==========

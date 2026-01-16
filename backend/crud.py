@@ -21,7 +21,7 @@ from typing import List, Optional
 
 # 第三方库导入
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, text
+from sqlalchemy import select, or_, text, func, distinct
 
 # 内部模块导入
 from models import BlogPost, Comment
@@ -329,13 +329,12 @@ async def get_archive_years(db: AsyncSession) -> List[int]:
     Returns:
         List[int]: 有文章的年份列表（降序）
     """
-    # 使用原生 SQL 提取年份（表名是 blog_posts）
+    # 使用 SQLAlchemy 的 func.extract 提取年份（替代原生 SQL）
     result = await db.execute(
-        text(
-            "SELECT DISTINCT EXTRACT(YEAR FROM date)::int as year FROM blog_posts ORDER BY year DESC"
-        )
+        select(distinct(func.extract('YEAR', BlogPost.date).label('year')))
+        .order_by(func.extract('YEAR', BlogPost.date).desc())
     )
-    years = [row[0] for row in result.fetchall() if row[0]]
+    years = [int(row[0]) for row in result.fetchall() if row[0]]
     return years
 
 

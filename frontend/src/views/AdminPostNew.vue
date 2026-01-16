@@ -111,6 +111,9 @@
 // 从 vue 导入 Composition API 工具
 import { ref, computed, onMounted, watch } from 'vue'
 
+// 从 VueUse 导入防抖函数
+import { useDebounceFn } from '@vueuse/core'
+
 // 从 vue-router 导入路由功能
 import { useRouter, useRoute } from 'vue-router'
 
@@ -225,9 +228,6 @@ const titleValidation = ref<{
   message: ''
 })
 
-// 防抖定时器
-let titleCheckTimer: ReturnType<typeof setTimeout> | null = null
-
 // ========== 计算属性 ==========
 
 /**
@@ -304,43 +304,26 @@ const checkTitleDuplicate = async () => {
   }
 
   try {
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-    const response = await fetch(`${apiBaseUrl}/api/posts/check-title`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('adminToken') || ''}`
-      },
-      body: JSON.stringify({
-        title,
-        exclude_id: postId.value
-      })
+    const data = await blogApi.checkTitle({
+      title,
+      excludeId: postId.value || undefined
     })
-
-    if (response.ok) {
-      const data: TitleCheckResponse = await response.json()
-      titleValidation.value = {
-        checking: false,
-        exists: data.exists,
-        message: data.message
-      }
-    } else if (response.status === 401) {
-      // 未授权 - 可能是 token 过期
-      titleValidation.value = {
-        checking: false,
-        exists: false,
-        message: ''
-      }
-    } else {
-      // 其他错误，不阻断用户操作
-      titleValidation.value = {
-        checking: false,
-        exists: false,
-        message: ''
-      }
+    titleValidation.value = {
+      checking: false,
+      exists: data.exists,
+      message: data.message
     }
-  } catch {
-    // 网络错误时忽略，不阻断用户操作
+  } catch (error: any) {
+    // 检查是否为 401 错误（token 失效）
+    if (error.response?.status === 401) {
+      // 清除失效的 token
+      localStorage.removeItem('adminToken')
+      // 重置认证状态
+      authStore.token = null
+      // 显示登录对话框
+      showLoginDialog()
+    }
+    // 不阻断用户操作
     titleValidation.value = {
       checking: false,
       exists: false,
@@ -395,18 +378,17 @@ const handleSubmit = async () => {
 // ========== 监听器 ==========
 
 /**
+ * 防抖后的标题检查函数（500ms 延迟）
+ */
+const debouncedCheckTitle = useDebounceFn(() => {
+  checkTitleDuplicate()
+}, 500)
+
+/**
  * 监听标题变化，使用防抖检查重复
  */
 watch(() => formData.value.title, () => {
-  // 清除之前的定时器
-  if (titleCheckTimer) {
-    clearTimeout(titleCheckTimer)
-  }
-
-  // 设置新的防抖定时器（500ms 后检查）
-  titleCheckTimer = setTimeout(() => {
-    checkTitleDuplicate()
-  }, 500)
+  debouncedCheckTitle()
 })
 
 // ========== 生命周期 ==========

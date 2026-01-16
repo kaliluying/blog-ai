@@ -23,15 +23,9 @@ Pydantic 数据验证模式（Schemas）模块
 from datetime import datetime
 
 # 第三方库导入
-from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import List, Optional
 import re
-
-
-# ========== 用户相关模式 ==========
-
-# 注意：用户系统已简化为仅博主管理
-# 普通用户无需注册登录即可发表评论
 
 
 # ========== 文章相关模式 ==========
@@ -64,7 +58,9 @@ class TitleCheckRequest(BaseModel):
     """标题唯一性检查请求模式"""
 
     title: str = Field(..., min_length=1, max_length=255)
-    exclude_id: Optional[int] = None
+    exclude_id: Optional[int] = Field(None, alias="excludeId")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class TitleCheckResponse(BaseModel):
