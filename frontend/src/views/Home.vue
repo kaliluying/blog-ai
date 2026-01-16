@@ -206,6 +206,9 @@ import { useRouter } from 'vue-router'
 // 从 stores 导入博客状态管理
 import { useBlogStore } from '@/stores/blog'
 
+// 从 types 导入类型定义
+import type { BlogPost } from '@/types'
+
 // 分页配置
 const POSTS_PER_PAGE = 10
 
@@ -270,9 +273,9 @@ const pageSize = computed(() => blogStore.pageSize)
  */
 const allTags = computed(() => {
   const tags = new Set<string>()
-  posts.value.forEach(post => {
+  posts.value.forEach((post: BlogPost) => {
     const postTags = post.tags || []
-    postTags.forEach(tag => tags.add(tag))
+    postTags.forEach((tag: string) => tags.add(tag))
   })
   return Array.from(tags)
 })
@@ -412,6 +415,12 @@ const goToTag = (tag: string) => {
   color: var(--text-primary);
   line-height: 1.6;
   margin-bottom: 16px;
+  /* 最多显示 3 行，超出隐藏 */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .loading-state,

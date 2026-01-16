@@ -82,22 +82,26 @@
 </template>
 
 <script setup lang="ts">
+defineOptions({
+  name: 'ArchivePage'
+})
+
 import { ref, computed, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { NSpin, NButton, NCollapse, NCollapseItem } from 'naive-ui'
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
 import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
-import { archiveApi, type ArchiveYear } from '@/api'
+import { archiveApi } from '@/api'
+import type { ArchiveYear } from '@/types'
 
 const router = useRouter()
-const route = useRoute()
 
 const archiveData = ref<ArchiveYear[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 
 const totalPostCount = computed(() => {
-  return archiveData.value.reduce((sum, year) => sum + year.post_count, 0)
+  return archiveData.value.reduce((sum: number, year: ArchiveYear) => sum + year.post_count, 0)
 })
 
 const fetchArchive = async () => {
@@ -106,7 +110,7 @@ const fetchArchive = async () => {
 
   try {
     archiveData.value = await archiveApi.getArchive()
-  } catch (e: any) {
+  } catch (e: unknown) {
     error.value = '加载归档失败'
     console.error(e)
   } finally {

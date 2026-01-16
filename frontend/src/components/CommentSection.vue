@@ -154,8 +154,11 @@ import { useMessage } from 'naive-ui'
 // 从 stores 导入认证状态管理
 import { useAdminStore } from '@/stores/auth'
 
-// 从 api 导入评论 API 和类型定义
-import { commentApi, type Comment } from '@/api'
+// 从 api 导入评论 API
+import { commentApi } from '@/api'
+
+// 从 types 导入类型定义
+import type { Comment } from '@/types'
 
 // 导入手绘风格图标组件
 import HandDrawnIcon from '@/components/HandDrawnIcon.vue'

@@ -56,6 +56,7 @@ import { NSpin, NButton, NTag } from 'naive-ui'
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
 import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
 import { useBlogStore } from '@/stores/blog'
+import type { BlogPost } from '@/types'
 import { formatDate } from '@/utils/date'
 
 const router = useRouter()
@@ -69,9 +70,9 @@ const tag = computed(() => route.params.tag as string)
 
 const filteredPosts = computed(() => {
   if (!tag.value) return []
-  return allPosts.value.filter(post => {
+  return allPosts.value.filter((post: BlogPost) => {
     const tags = post.tags || []
-    return tags.some(t => t.toLowerCase() === tag.value.toLowerCase())
+    return tags.some((t: string) => t.toLowerCase() === tag.value.toLowerCase())
   })
 })
 

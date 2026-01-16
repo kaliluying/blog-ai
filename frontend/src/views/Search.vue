@@ -44,7 +44,8 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { blogApi, type BlogPost } from '@/api'
+import { blogApi } from '@/api'
+import type { BlogPost } from '@/types'
 import { formatShortDate } from '@/utils/date'
 
 defineOptions({

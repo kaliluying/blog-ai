@@ -97,7 +97,8 @@ import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
 // 导入 Store 和 API
 import { useBlogStore } from '@/stores/blog'
 import { useAdminStore } from '@/stores/auth'
-import { blogApi, type BlogPost } from '@/api'
+import { blogApi } from '@/api'
+import type { BlogPost } from '@/types'
 import { formatDate } from '@/utils/date'
 
 // ========== 组合式函数 ==========
@@ -141,14 +142,14 @@ const filteredPosts = computed(() => {
   const keyword = searchKeyword.value.toLowerCase()
 
   // 过滤文章
-  return posts.value.filter(post => {
+  return posts.value.filter((post: BlogPost) => {
     const tags = post.tags || []
     // 匹配标题
     return post.title.toLowerCase().includes(keyword) ||
       // 匹配摘要
       post.excerpt.toLowerCase().includes(keyword) ||
       // 匹配标签
-      tags.some(tag => tag.toLowerCase().includes(keyword))
+      tags.some((tag: string) => tag.toLowerCase().includes(keyword))
   })
 })
 
@@ -215,11 +216,23 @@ const createColumns = (): DataTableColumns<BlogPost> => [
     key: 'tags',
     render: (row) => h(NSpace, () => (row.tags || []).map((tag: string) => h(NTag, { size: 'small', round: true }, () => tag)))
   },
+  // 状态列
+  {
+    title: '状态',
+    key: 'status',
+    width: 100,
+    render: (row) => {
+      if (row.is_scheduled) {
+        return h(NTag, { type: 'warning', size: 'small' }, () => '定时中')
+      }
+      return h(NTag, { type: 'success', size: 'small' }, () => '已发布')
+    }
+  },
   // 日期列（格式化显示）
   {
-    title: '日期',
+    title: '发布日期',
     key: 'date',
-    width: 120,
+    width: 150,
     render: (row) => formatDate(row.date)
   },
   // 操作列（编辑和删除按钮）
@@ -279,9 +292,9 @@ const handlePageSizeChange = (size: number) => {
 
 // ========== 生命周期 ==========
 
-// 组件挂载时获取文章列表
+// 组件挂载时获取文章列表（包括定时发布的）
 onMounted(() => {
-  blogStore.fetchPosts()
+  blogStore.fetchAdminPosts()
 })
 
 // 监听搜索关键词变化，重置分页

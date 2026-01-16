@@ -67,6 +67,24 @@
             <n-dynamic-tags v-model:value="formData.tags" />
           </div>
 
+          <!-- 定时发布 -->
+          <div class="form-row">
+            <span class="form-label">定时发布</span>
+            <div class="publish-date-row">
+              <n-switch v-model:value="enableSchedule" />
+              <span class="schedule-hint">{{ enableSchedule ? '设置发布时间' : '立即发布' }}</span>
+            </div>
+            <n-date-picker
+              v-if="enableSchedule"
+              v-model:value="publishDateValue"
+              type="datetime"
+              clearable
+              style="width: 300px"
+              placeholder="选择发布时间"
+              value-format="yyyy-MM-dd'T'HH:mm"
+            />
+          </div>
+
           <!-- 内容编辑/预览 -->
           <div class="form-row">
             <span class="form-label">内容</span>
@@ -126,7 +144,8 @@ import HandDrawnDivider from '@/components/HandDrawnDivider.vue'
 import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
 
 // 导入 API 和工具函数
-import { blogApi, type BlogPostCreate, type BlogPostUpdate } from '@/api'
+import { blogApi } from '@/api'
+import type { BlogPostCreate } from '@/types'
 import { renderMarkdownSafe } from '@/utils/markdown'
 
 // 导入 auth store
@@ -136,9 +155,8 @@ import { useAuthStore } from '@/stores/auth'
 
 type FormData = BlogPostCreate
 
-interface TitleCheckResponse {
-  exists: boolean
-  message: string
+type SubmitData = BlogPostCreate & {
+  publish_date?: string
 }
 
 // ========== 组合式函数 ==========
@@ -214,8 +232,15 @@ const formData = ref<FormData>({
   title: '',
   excerpt: '',
   content: '',
-  tags: []
+  tags: [],
+  publish_date: undefined
 })
+
+// 是否启用定时发布
+const enableSchedule = ref(false)
+
+// 定时发布时间（时间戳，用于 date-picker 绑定）
+const publishDateValue = ref<number | null>(null)
 
 // 标题验证状态
 const titleValidation = ref<{
@@ -255,7 +280,14 @@ const fetchPost = async () => {
       title: post.title,
       excerpt: post.excerpt,
       content: post.content,
-      tags: post.tags || []
+      tags: post.tags || [],
+      publish_date: undefined
+    }
+    // 如果文章是定时发布的（未来时间），显示定时发布设置
+    if (post.is_scheduled && post.date) {
+      enableSchedule.value = true
+      // 转换为时间戳
+      publishDateValue.value = new Date(post.date).getTime()
     }
     // 重置标题验证状态
     titleValidation.value = {
@@ -313,17 +345,13 @@ const checkTitleDuplicate = async () => {
       exists: data.exists,
       message: data.message
     }
-  } catch (error: any) {
-    // 检查是否为 401 错误（token 失效）
-    if (error.response?.status === 401) {
-      // 清除失效的 token
+  } catch (error: unknown) {
+    const axiosError = error as { response?: { status?: number } }
+    if (axiosError.response?.status === 401) {
       localStorage.removeItem('adminToken')
-      // 重置认证状态
       authStore.token = null
-      // 显示登录对话框
       showLoginDialog()
     }
-    // 不阻断用户操作
     titleValidation.value = {
       checking: false,
       exists: false,
@@ -355,15 +383,34 @@ const handleSubmit = async () => {
     return
   }
 
+  // 如果启用了定时发布但没有设置时间
+  if (enableSchedule.value && publishDateValue.value === null) {
+    message.warning('请设置定时发布时间')
+    return
+  }
+
   // 开始提交
   submitting.value = true
 
   try {
+    const submitData: SubmitData = {
+      title: formData.value.title,
+      excerpt: formData.value.excerpt,
+      content: formData.value.content,
+      tags: formData.value.tags
+    }
+
+    if (enableSchedule.value && publishDateValue.value !== null) {
+      // 将时间戳转换为 ISO 格式字符串
+      const date = new Date(publishDateValue.value)
+      submitData.publish_date = date.toISOString().slice(0, 16)
+    }
+
     if (isEditMode.value) {
-      await blogApi.updatePost(postId.value!, formData.value as BlogPostUpdate)
+      await blogApi.updatePost(postId.value!, submitData)
       message.success('文章更新成功')
     } else {
-      await blogApi.createPost(formData.value)
+      await blogApi.createPost(submitData)
       message.success('文章发布成功')
     }
     router.push('/admin/posts')
@@ -463,6 +510,18 @@ onMounted(async () => {
   font-weight: 500;
   color: #34495e;
   margin-bottom: 8px;
+}
+
+.publish-date-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.schedule-hint {
+  font-size: 0.875rem;
+  color: #7f8c8d;
 }
 
 .editor-container {

@@ -26,9 +26,17 @@
 
 ```bash
 cd backend
+
+# 安装依赖
 uv sync
-# 编辑 .env 配置 DATABASE_URL 和 ADMIN_PASSWORD
+
+# 配置环境变量
+cp .env.example .env  # 编辑 DATABASE_URL 和 ADMIN_PASSWORD
+
+# 运行数据库迁移
 uv run alembic upgrade head
+
+# 启动服务
 uv run python main.py
 ```
 
@@ -38,19 +46,70 @@ uv run python main.py
 
 ```bash
 cd frontend
+
+# 安装依赖
 npm install
+
+# 启动开发服务器
 npm run dev
 ```
 
 前端运行在 http://localhost:5173
 
+## 命令参考
+
+### 前端
+
+| 命令 | 描述 |
+|------|------|
+| `npm run dev` | 启动开发服务器 |
+| `npm run build` | 构建生产版本 |
+| `npm run type-check` | TypeScript 类型检查 |
+| `npm run lint` | 代码检查并修复 |
+| `npm run format` | 使用 Prettier 格式化代码 |
+| `npm run test` | 运行测试 (监听模式) |
+| `npm run test:run` | 运行测试一次 |
+
+### 后端
+
+```bash
+cd backend
+
+# 启动服务
+uv run python main.py
+
+# 运行测试
+uv run pytest
+uv run pytest tests/test_posts.py -v  # 运行指定测试文件
+
+# 模型变更后生成迁移
+uv run alembic revision --autogenerate -m "描述变更"
+uv run alembic upgrade head
+```
+
 ## Docker 部署
 
 ```bash
+# 构建并启动所有服务
 docker-compose up -d
+
+# 查看日志
+docker-compose logs -f
+
+# 重新构建镜像
+docker-compose up -d --build
 ```
 
-服务端口：前端 80，后端 8000，数据库 5432
+**端口**：前端 80，后端 8000，数据库 5432
+
+## 环境变量
+
+### 后端 (backend/.env)
+
+```env
+DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/blog
+ADMIN_PASSWORD=admin123
+```
 
 ## 技术栈
 
@@ -59,85 +118,44 @@ docker-compose up -d
 - Naive UI + Rough.js (手绘风格)
 - Pinia + Vue Router + Axios
 - DOMPurify (XSS 防护) + VueUse
+- Vitest (测试)
 
 ### 后端
 - FastAPI + SQLAlchemy 2.0 (异步)
 - PostgreSQL + asyncpg
 - Alembic (数据库迁移)
+- Pytest (测试)
 
 ## 项目结构
 
 ```
 blog-ai/
-├── frontend/                 # Vue 3 前端项目
+├── frontend/                 # Vue 3 前端
 │   ├── src/
 │   │   ├── api/             # API 接口定义
-│   │   │   └── index.ts     # Axios 客户端与类型定义
 │   │   ├── components/       # Vue 组件
-│   │   │   ├── HandDrawnBackground.vue  # 手绘背景
-│   │   │   ├── HandDrawnBorder.vue      # 手绘边框
-│   │   │   ├── HandDrawnCard.vue        # 手绘卡片
-│   │   │   ├── HandDrawnConfirm.vue     # 手绘确认框
-│   │   │   ├── HandDrawnDivider.vue     # 手绘分割线
-│   │   │   ├── HandDrawnIcon.vue        # 手绘图标
-│   │   │   ├── ArticleSidebar.vue       # 文章侧边栏
-│   │   │   ├── CommentSection.vue       # 评论组件
-│   │   │   ├── PageDecorations.vue      # 页面装饰
-│   │   │   ├── PopularPosts.vue         # 热门文章
-│   │   │   ├── RelatedPosts.vue         # 相关文章
-│   │   │   ├── TableOfContents.vue      # 文章目录
-│   │   │   └── icons/                   # 标准 SVG 图标
+│   │   │   ├── HandDrawn*   # 手绘风格组件 (Rough.js)
+│   │   │   └── icons/       # 标准 SVG 图标
 │   │   ├── composables/      # 组合式函数
-│   │   │   └── useCodeCopy.ts  # 代码复制功能
 │   │   ├── router/           # Vue Router 配置
-│   │   │   └── index.ts      # 路由定义
 │   │   ├── stores/           # Pinia 状态管理
-│   │   │   ├── auth.ts       # 认证状态
-│   │   │   ├── blog.ts       # 文章状态
-│   │   │   └── theme.ts      # 主题状态
 │   │   ├── types/            # TypeScript 类型
-│   │   │   └── index.ts      # 类型定义
 │   │   ├── utils/            # 工具函数
-│   │   │   ├── date.ts       # 日期格式化
-│   │   │   └── markdown.ts   # Markdown 渲染
-│   │   ├── views/            # 页面视图
-│   │   │   ├── AdminLogin.vue        # 管理员登录
-│   │   │   ├── AdminPostNew.vue      # 新建/编辑文章
-│   │   │   ├── AdminPosts.vue        # 文章管理
-│   │   │   ├── Archive.vue           # 归档页
-│   │   │   ├── ArchiveMonth.vue      # 月度归档
-│   │   │   ├── Article.vue           # 文章详情
-│   │   │   ├── Home.vue              # 首页
-│   │   │   ├── Search.vue            # 搜索页
-│   │   │   └── TagPosts.vue          # 标签文章
-│   │   ├── App.vue            # 根组件
-│   │   └── main.ts            # 入口文件
-│   ├── .env                   # 环境变量
-│   ├── .eslintrc.cjs          # ESLint 配置
-│   ├── index.html             # HTML 模板
-│   ├── package.json           # 项目配置
-│   ├── tsconfig.json          # TypeScript 配置
-│   └── vite.config.ts         # Vite 配置
+│   │   └── views/            # 页面视图
+│   └── ...
 │
-├── backend/                  # FastAPI 后端项目
-│   ├── main.py               # FastAPI 应用入口
-│   ├── models.py             # SQLAlchemy ORM 模型
-│   ├── schemas.py            # Pydantic 模式定义
-│   ├── crud.py               # 异步数据库操作
-│   ├── database.py           # 数据库连接配置
-│   ├── auth.py               # 管理员认证
-│   ├── utils/
-│   │   └── time.py           # 时间工具函数
-│   ├── migrations/           # Alembic 迁移脚本
-│   │   ├── env.py            # 迁移环境配置
-│   │   └── versions/         # 迁移版本文件
-│   ├── .env                  # 环境变量
-│   ├── Dockerfile            # Docker 构建文件
-│   └── pyproject.toml        # Python 依赖配置
+├── backend/                  # FastAPI 后端
+│   ├── main.py              # 应用入口
+│   ├── models.py            # SQLAlchemy ORM 模型
+│   ├── schemas.py           # Pydantic 模式定义
+│   ├── crud.py              # 异步数据库操作
+│   ├── database.py          # 数据库连接配置
+│   ├── auth.py              # 管理员认证
+│   ├── migrations/          # Alembic 迁移脚本
+│   └── ...
 │
-├── docker-compose.yml        # Docker Compose 配置
-├── CLAUDE.md                 # Claude Code 指导文件
-└── README.md                 # 项目说明文档
+├── docker-compose.yml       # Docker Compose 配置
+└── README.md
 ```
 
 ## 许可证

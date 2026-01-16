@@ -99,16 +99,14 @@ import { ref, computed, onMounted, watch, onUnmounted, nextTick } from 'vue'
 // 从 vue-router 导入路由功能
 import { useRoute, useRouter } from 'vue-router'
 
-// 从 naive-ui 导入消息提示
-import { useMessage } from 'naive-ui'
-
 // 导入自定义手绘风格组件
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
 import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
 
 // 导入 API 和工具函数
-import { blogApi, commentApi, type BlogPost, type Comment } from '@/api'
-import { renderMarkdownWithCodeSafe, decodeCode } from '@/utils/markdown'
+import { blogApi, commentApi } from '@/api'
+import type { BlogPost, Comment } from '@/types'
+import { renderMarkdownWithCodeSafe } from '@/utils/markdown'
 import { formatDate } from '@/utils/date'
 
 // 导入博客 Store（用于记录浏览）
@@ -142,9 +140,6 @@ const route = useRoute()
 
 // 路由实例（用于页面导航）
 const router = useRouter()
-
-// 消息提示实例
-const message = useMessage()
 
 // 博客 Store 实例（用于记录浏览）
 const blogStore = useBlogStore()

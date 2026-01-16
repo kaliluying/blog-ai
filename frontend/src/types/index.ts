@@ -21,6 +21,7 @@ export interface BlogPost {
   created_at: string            // 创建时间
   updated_at: string            // 更新时间
   view_count: number            // 阅读量
+  is_scheduled?: boolean        // 是否定时发布（未来时间）
 }
 
 /**
@@ -31,6 +32,7 @@ export interface BlogPostCreate {
   excerpt: string
   content: string
   tags: string[]
+  publish_date?: string  // 定时发布时间（可选）
 }
 
 /**
@@ -41,6 +43,7 @@ export interface BlogPostUpdate {
   excerpt?: string
   content?: string
   tags?: string[]
+  publish_date?: string  // 定时发布时间（可选）
 }
 
 /**

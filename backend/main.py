@@ -49,6 +49,8 @@ from schemas import (
     TitleCheckResponse,
 )
 
+from utils.time import utc_now
+
 
 # ========== 管理员认证 Pydantic 模型 ==========
 
@@ -269,6 +271,7 @@ def parse_post_tags(post: BlogPost) -> List[str]:
 
 def post_to_dict(post: BlogPost) -> dict:
     """将 BlogPost ORM 模型转换为完整字典"""
+    now = utc_now()
     return {
         "id": post.id,
         "title": post.title,
@@ -279,6 +282,7 @@ def post_to_dict(post: BlogPost) -> dict:
         "updated_at": post.updated_at,
         "tags": parse_post_tags(post),
         "view_count": post.view_count,
+        "is_scheduled": post.date > now,  # 是否定时发布（未来时间）
     }
 
 
@@ -348,7 +352,9 @@ def group_posts_by_month(posts: List[BlogPost], year: int) -> List[ArchiveGroup]
 
 @app.get("/api/search", response_model=List[SearchResult])
 async def search_articles(
-    q: str, skip: int = 0, limit: int = 50, db: AsyncSession = Depends(get_db)
+    q: str, skip: int = 0, limit: int = 50,
+    include_scheduled: bool = False,
+    db: AsyncSession = Depends(get_db)
 ):
     """
     搜索文章
@@ -357,11 +363,12 @@ async def search_articles(
         q: 搜索关键词
         skip: 分页偏移
         limit: 返回数量限制
+        include_scheduled: 是否包含定时发布的文章
 
     Returns:
         List[SearchResult]: 搜索结果列表
     """
-    posts = await search_posts(db, query=q, skip=skip, limit=limit)
+    posts = await search_posts(db, query=q, skip=skip, limit=limit, include_scheduled=include_scheduled)
     return [post_to_dict(p) for p in posts]
 
 
@@ -493,14 +500,17 @@ async def delete_comment_route(
 @app.get("/api/posts/count")
 async def get_posts_count(db: AsyncSession = Depends(get_db)):
     """
-    获取文章总数
+    获取已发布文章总数
 
     Returns:
         dict: 文章总数
     """
     from sqlalchemy import select, func
+    now = utc_now()
 
-    result = await db.execute(select(func.count(BlogPost.id)))
+    result = await db.execute(
+        select(func.count(BlogPost.id)).where(BlogPost.date <= now)
+    )
     count = result.scalar_one_or_none() or 0
 
     return {"count": count}
@@ -508,7 +518,9 @@ async def get_posts_count(db: AsyncSession = Depends(get_db)):
 
 @app.get("/api/posts")
 async def list_posts(
-    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)
+    skip: int = 0, limit: int = 100,
+    include_scheduled: bool = False,
+    db: AsyncSession = Depends(get_db)
 ):
     """
     获取文章列表
@@ -516,11 +528,12 @@ async def list_posts(
     Query Parameters:
         skip: 跳过的记录数（分页偏移），默认 0
         limit: 返回的最大记录数，默认 100
+        include_scheduled: 是否包含定时发布的文章（仅管理员可用）
 
     Returns:
         List[dict]: 文章列表，每篇文章包含基本信息
     """
-    posts = await get_posts(db, skip=skip, limit=limit)
+    posts = await get_posts(db, skip=skip, limit=limit, include_scheduled=include_scheduled)
     # 将 ORM 模型列表转换为字典列表
     return [post_to_dict(p) for p in posts]
 
@@ -528,6 +541,7 @@ async def list_posts(
 @app.get("/api/posts/popular")
 async def get_popular_posts_route(
     limit: int = 5,
+    include_scheduled: bool = False,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -535,11 +549,12 @@ async def get_popular_posts_route(
 
     Query Parameters:
         limit: 返回数量限制，默认 5
+        include_scheduled: 是否包含定时发布的文章
 
     Returns:
         List[dict]: 热门文章列表
     """
-    posts = await get_popular_posts(db, limit=limit)
+    posts = await get_popular_posts(db, limit=limit, include_scheduled=include_scheduled)
     return [post_to_list_item(p) for p in posts]
 
 
@@ -567,6 +582,7 @@ async def get_post(post_id: int, db: AsyncSession = Depends(get_db)):
 async def get_related_posts_route(
     post_id: int,
     limit: int = 5,
+    include_scheduled: bool = False,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -577,6 +593,7 @@ async def get_related_posts_route(
 
     Query Parameters:
         limit: 返回数量限制，默认 5
+        include_scheduled: 是否包含定时发布的文章
 
     Returns:
         List[dict]: 相关文章列表
@@ -589,7 +606,7 @@ async def get_related_posts_route(
     if not tags:
         return []
 
-    related = await get_related_posts(db, post_id, tags, limit)
+    related = await get_related_posts(db, post_id, tags, limit, include_scheduled)
     return [post_to_list_item(p) for p in related]
 
 
@@ -771,11 +788,17 @@ async def delete_existing_post(
 
 
 @app.get("/api/archive", response_model=List[ArchiveYear])
-async def get_archive_list(db: AsyncSession = Depends(get_db)):
+async def get_archive_list(
+    include_scheduled: bool = False,
+    db: AsyncSession = Depends(get_db)
+):
     """
     获取文章归档列表
 
-    按年份和月份分组返回所有文章
+    按年份和月份分组返回所有已发布文章
+
+    Query Parameters:
+        include_scheduled: 是否包含定时发布的文章
 
     Returns:
         List[ArchiveYear]: 年度归档列表
@@ -784,7 +807,7 @@ async def get_archive_list(db: AsyncSession = Depends(get_db)):
     result = []
 
     for year in years:
-        posts = await get_archive_by_year(db, year)
+        posts = await get_archive_by_year(db, year, include_scheduled)
         months = group_posts_by_month(posts, year)
         result.append(ArchiveYear(year=year, post_count=len(posts), months=months))
 
@@ -794,6 +817,7 @@ async def get_archive_list(db: AsyncSession = Depends(get_db)):
 @app.get("/api/archive/{year}", response_model=ArchiveYear)
 async def get_archive_by_year_route(
     year: int,
+    include_scheduled: bool = False,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -802,10 +826,13 @@ async def get_archive_by_year_route(
     Path Parameters:
         year: 年份
 
+    Query Parameters:
+        include_scheduled: 是否包含定时发布的文章
+
     Returns:
         ArchiveYear: 年度归档信息
     """
-    posts = await get_archive_by_year(db, year)
+    posts = await get_archive_by_year(db, year, include_scheduled)
 
     if not posts:
         raise HTTPException(
@@ -820,6 +847,7 @@ async def get_archive_by_year_route(
 async def get_archive_by_year_month_route(
     year: int,
     month: int,
+    include_scheduled: bool = False,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -829,6 +857,9 @@ async def get_archive_by_year_month_route(
         year: 年份
         month: 月份 (1-12)
 
+    Query Parameters:
+        include_scheduled: 是否包含定时发布的文章
+
     Returns:
         ArchiveGroup: 月度归档信息
     """
@@ -837,7 +868,7 @@ async def get_archive_by_year_month_route(
             status_code=status.HTTP_400_BAD_REQUEST, detail="月份必须在 1-12 之间"
         )
 
-    posts = await get_archive_posts_by_year_month(db, year, month)
+    posts = await get_archive_posts_by_year_month(db, year, month, include_scheduled)
 
     if not posts:
         raise HTTPException(

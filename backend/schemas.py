@@ -23,7 +23,7 @@ Pydantic 数据验证模式（Schemas）模块
 from datetime import datetime
 
 # 第三方库导入
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 import re
 
@@ -43,6 +43,7 @@ class BlogPostCreate(BlogPostBase):
     """创建文章请求模式"""
 
     tags: List[str] = []
+    publish_date: Optional[datetime] = Field(None, description="定时发布时间（可选）")
 
 
 class BlogPostUpdate(BlogPostBase):
@@ -52,6 +53,7 @@ class BlogPostUpdate(BlogPostBase):
     excerpt: Optional[str] = None
     content: Optional[str] = None
     tags: Optional[List[str]] = None
+    publish_date: Optional[datetime] = Field(None, description="定时发布时间（可选）")
 
 
 class TitleCheckRequest(BaseModel):

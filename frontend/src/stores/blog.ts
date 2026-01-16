@@ -12,7 +12,8 @@
 
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { blogApi, viewApi, type BlogPost, type ViewCountResponse } from '@/api'
+import { blogApi, viewApi } from '@/api'
+import type { BlogPost, ViewCountResponse } from '@/types'
 
 /**
  * 创建博客 Store
@@ -103,13 +104,13 @@ export const useBlogStore = defineStore('blog', () => {
   /**
    * 获取所有文章（不分页）
    */
-  const fetchAllPosts = async () => {
+  const fetchAllPosts = async (includeScheduled: boolean = false) => {
     loading.value = true
     error.value = null
     originalError.value = null
 
     try {
-      posts.value = await blogApi.getPosts()
+      posts.value = await blogApi.getPosts(0, 1000, includeScheduled)
     } catch (e) {
       error.value = '获取文章列表失败'
       originalError.value = e instanceof Error ? e : new Error(String(e))
@@ -120,13 +121,21 @@ export const useBlogStore = defineStore('blog', () => {
   }
 
   /**
+   * 获取所有文章（包括定时发布的）
+   * 供管理员使用
+   */
+  const fetchAdminPosts = async () => {
+    await fetchAllPosts(true)
+  }
+
+  /**
    * 根据 ID 查找文章（从缓存中）
    *
    * @param id 文章 ID
    * @returns 找到的文章或 undefined
    */
   const getPostById = (id: number) => {
-    return posts.value.find((post) => post.id === id)
+    return posts.value.find((post: BlogPost) => post.id === id)
   }
 
   /**
@@ -147,7 +156,7 @@ export const useBlogStore = defineStore('blog', () => {
       const post = await blogApi.getPost(id)
 
       // 如果文章不在缓存列表中，添加到列表
-      if (!posts.value.find((p) => p.id === id)) {
+      if (!posts.value.find((p: BlogPost) => p.id === id)) {
         posts.value.push(post)
       }
 
@@ -189,7 +198,7 @@ export const useBlogStore = defineStore('blog', () => {
     try {
       const result: ViewCountResponse = await viewApi.recordView(postId)
       // 更新缓存中的阅读量
-      const post = posts.value.find((p) => p.id === postId)
+      const post = posts.value.find((p: BlogPost) => p.id === postId)
       if (post) {
         post.view_count = result.view_count
       }
@@ -213,6 +222,7 @@ export const useBlogStore = defineStore('blog', () => {
     pageSize,
     fetchPosts,
     fetchAllPosts,
+    fetchAdminPosts,
     getPostById,
     fetchPostById,
     fetchPopularPosts,

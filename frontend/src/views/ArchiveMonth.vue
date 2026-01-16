@@ -56,7 +56,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { NSpin, NButton, NTag } from 'naive-ui'
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
 import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
-import { archiveApi, type ArchiveGroup } from '@/api'
+import { archiveApi } from '@/api'
+import type { ArchiveGroup } from '@/types'
 import { formatDate, MONTH_NAMES } from '@/utils/date'
 
 const router = useRouter()

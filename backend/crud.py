@@ -33,24 +33,34 @@ from utils.time import utc_now
 
 
 async def get_posts(
-    db: AsyncSession, skip: int = 0, limit: int = 100
+    db: AsyncSession, skip: int = 0, limit: int = 100, include_scheduled: bool = False
 ) -> List[BlogPost]:
     """
     获取文章列表
 
     支持分页查询，按日期降序排序（最新的在前）。
+    默认只返回已发布的文章（date <= now）。
 
     Args:
         db: 数据库会话
         skip: 跳过的记录数（分页偏移），默认 0
         limit: 返回的最大记录数，默认 100
+        include_scheduled: 是否包含定时发布的文章（管理员使用）
 
     Returns:
         List[BlogPost]: 文章 ORM 模型列表
     """
+    now = utc_now()
+
     # 构建查询：按日期降序排列，分页
+    query = select(BlogPost)
+
+    # 非管理员模式下，过滤未发布的文章
+    if not include_scheduled:
+        query = query.where(BlogPost.date <= now)
+
     result = await db.execute(
-        select(BlogPost)
+        query
         .order_by(BlogPost.date.desc())  # 降序：最新的在前
         .offset(skip)  # 分页偏移
         .limit(limit)  # 返回数量限制
@@ -115,13 +125,16 @@ async def create_post(
     Returns:
         BlogPost: 创建的文章 ORM 模型
     """
+    # 确定发布日期：如果指定了 publish_date 则使用，否则使用当前时间
+    publish_date = post.publish_date if post.publish_date else utc_now()
+
     # 创建 ORM 模型实例
     db_post = BlogPost(
         title=post.title,
         excerpt=post.excerpt,
         content=post.content,
         tags=tags or [],
-        date=utc_now(),
+        date=publish_date,
     )
 
     # 添加到会话并提交
@@ -142,6 +155,7 @@ async def update_post(
 
     支持部分更新，只更新提供的字段。
     如果 tags 参数提供，则同时更新标签。
+    如果提供了 publish_date，则更新文章的 date 字段。
 
     Args:
         db: 数据库会话
@@ -167,6 +181,10 @@ async def update_post(
     # 单独处理 tags 字段（如果提供）
     if tags is not None:
         db_post.tags = tags
+
+    # 单独处理 publish_date（如果提供）
+    if post_update.publish_date is not None:
+        db_post.date = post_update.publish_date
 
     # 提交事务
     await db.commit()
@@ -201,34 +219,42 @@ async def delete_post(db: AsyncSession, post_id: int) -> bool:
 
 
 async def search_posts(
-    db: AsyncSession, query: str, skip: int = 0, limit: int = 100
+    db: AsyncSession, query: str, skip: int = 0, limit: int = 100, include_scheduled: bool = False
 ) -> List[BlogPost]:
     """
     搜索文章
 
     在标题和内容中搜索关键词。
+    默认只返回已发布的文章。
 
     Args:
         db: 数据库会话
         query: 搜索关键词
         skip: 分页偏移
         limit: 返回数量限制
+        include_scheduled: 是否包含定时发布的文章
 
     Returns:
         List[BlogPost]: 匹配的文章列表
     """
+    now = utc_now()
+
     # 使用 ILIKE 进行大小写不敏感搜索
     search_pattern = f"%{query}%"
-    result = await db.execute(
-        select(BlogPost)
-        .where(
-            or_(
-                BlogPost.title.ilike(search_pattern),
-                BlogPost.content.ilike(search_pattern),
-                BlogPost.excerpt.ilike(search_pattern),
-            )
+    sql = select(BlogPost).where(
+        or_(
+            BlogPost.title.ilike(search_pattern),
+            BlogPost.content.ilike(search_pattern),
+            BlogPost.excerpt.ilike(search_pattern),
         )
-        .order_by(BlogPost.date.desc())
+    )
+
+    # 非管理员模式下，过滤未发布的文章
+    if not include_scheduled:
+        sql = sql.where(BlogPost.date <= now)
+
+    result = await db.execute(
+        sql.order_by(BlogPost.date.desc())
         .offset(skip)
         .limit(limit)
     )
@@ -291,7 +317,7 @@ async def delete_comment(db: AsyncSession, comment_id: int) -> bool:
 
 
 async def get_archive_posts_by_year_month(
-    db: AsyncSession, year: int, month: int
+    db: AsyncSession, year: int, month: int, include_scheduled: bool = False
 ) -> List[BlogPost]:
     """
     获取指定年月的文章列表
@@ -300,10 +326,13 @@ async def get_archive_posts_by_year_month(
         db: 数据库会话
         year: 年份
         month: 月份 (1-12)
+        include_scheduled: 是否包含定时发布的文章
 
     Returns:
         List[BlogPost]: 该年月的文章列表
     """
+    now = utc_now()
+
     # 计算该月的起始和结束时间
     start_date = datetime(year, month, 1)
     if month == 12:
@@ -311,10 +340,17 @@ async def get_archive_posts_by_year_month(
     else:
         end_date = datetime(year, month + 1, 1)
 
+    sql = select(BlogPost).where(
+        BlogPost.date >= start_date,
+        BlogPost.date < end_date
+    )
+
+    # 非管理员模式下，过滤未发布的文章
+    if not include_scheduled:
+        sql = sql.where(BlogPost.date <= now)
+
     result = await db.execute(
-        select(BlogPost)
-        .where(BlogPost.date >= start_date, BlogPost.date < end_date)
-        .order_by(BlogPost.date.desc())
+        sql.order_by(BlogPost.date.desc())
     )
     return result.scalars().all()
 
@@ -338,24 +374,36 @@ async def get_archive_years(db: AsyncSession) -> List[int]:
     return years
 
 
-async def get_archive_by_year(db: AsyncSession, year: int) -> List[BlogPost]:
+async def get_archive_by_year(
+    db: AsyncSession, year: int, include_scheduled: bool = False
+) -> List[BlogPost]:
     """
     获取指定年份的所有文章
 
     Args:
         db: 数据库会话
         year: 年份
+        include_scheduled: 是否包含定时发布的文章
 
     Returns:
         List[BlogPost]: 该年份的文章列表
     """
+    now = utc_now()
+
     start_date = datetime(year, 1, 1)
     end_date = datetime(year + 1, 1, 1)
 
+    sql = select(BlogPost).where(
+        BlogPost.date >= start_date,
+        BlogPost.date < end_date
+    )
+
+    # 非管理员模式下，过滤未发布的文章
+    if not include_scheduled:
+        sql = sql.where(BlogPost.date <= now)
+
     result = await db.execute(
-        select(BlogPost)
-        .where(BlogPost.date >= start_date, BlogPost.date < end_date)
-        .order_by(BlogPost.date.desc())
+        sql.order_by(BlogPost.date.desc())
     )
     return result.scalars().all()
 
@@ -468,22 +516,29 @@ async def record_post_view(db: AsyncSession, post_id: int, ip: str) -> bool:
     return True
 
 
-async def get_popular_posts(db: AsyncSession, limit: int = 5) -> List[BlogPost]:
+async def get_popular_posts(
+    db: AsyncSession, limit: int = 5, include_scheduled: bool = False
+) -> List[BlogPost]:
     """
     获取热门文章排行
 
     Args:
         db: 数据库会话
         limit: 返回数量限制
+        include_scheduled: 是否包含定时发布的文章
 
     Returns:
         List[BlogPost]: 按阅读量降序排列的文章列表
     """
-    result = await db.execute(
-        select(BlogPost)
-        .order_by(BlogPost.view_count.desc())
-        .limit(limit)
-    )
+    now = utc_now()
+
+    sql = select(BlogPost).order_by(BlogPost.view_count.desc())
+
+    # 非管理员模式下，过滤未发布的文章
+    if not include_scheduled:
+        sql = sql.where(BlogPost.date <= now)
+
+    result = await db.execute(sql.limit(limit))
     return result.scalars().all()
 
 
@@ -491,7 +546,8 @@ async def get_related_posts(
     db: AsyncSession,
     post_id: int,
     tags: List[str],
-    limit: int = 5
+    limit: int = 5,
+    include_scheduled: bool = False
 ) -> List[BlogPost]:
     """
     获取相关文章推荐
@@ -503,6 +559,7 @@ async def get_related_posts(
         post_id: 当前文章 ID（排除）
         tags: 当前文章的标签列表
         limit: 返回数量限制
+        include_scheduled: 是否包含定时发布的文章
 
     Returns:
         List[BlogPost]: 相关文章列表
@@ -510,20 +567,26 @@ async def get_related_posts(
     if not tags:
         return []
 
+    now = utc_now()
+
     # 构建标签匹配条件 - 使用 jsonb_exists 并确保类型转换兼容
     tag_conditions = []
-    params = {"post_id": post_id, "limit": limit}
+    params = {"post_id": post_id, "limit": limit, "now": now}
     for i, tag in enumerate(tags[:5]):
         tag_conditions.append(f"jsonb_exists(p.tags::jsonb, :tag{i})")
         params[f"tag{i}"] = tag
+
+    # 构建 WHERE 子句
+    where_clause = f"p.id != :post_id AND ({' OR '.join(tag_conditions)})"
+    if not include_scheduled:
+        where_clause += " AND p.date <= :now"
 
     # 使用子查询避免 GROUP BY 问题
     result = await db.execute(
         text(f"""
             SELECT p.*
             FROM blog_posts p
-            WHERE p.id != :post_id
-            AND ({' OR '.join(tag_conditions)})
+            WHERE {where_clause}
             ORDER BY p.view_count DESC
             LIMIT :limit
         """),

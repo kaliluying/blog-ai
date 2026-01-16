@@ -89,10 +89,11 @@ export const blogApi = {
    * 获取所有文章列表
    * @param skip 跳过的记录数，默认 0
    * @param limit 返回的最大记录数，默认 100
+   * @param includeScheduled 是否包含定时发布的文章，默认 false
    * @returns Promise<BlogPost[]> 文章数组
    */
-  getPosts: async (skip: number = 0, limit: number = 100): Promise<BlogPost[]> => {
-    return api.get('/api/posts', { params: { skip, limit } })
+  getPosts: async (skip: number = 0, limit: number = 100, includeScheduled: boolean = false): Promise<BlogPost[]> => {
+    return api.get('/api/posts', { params: { skip, limit, include_scheduled: includeScheduled } })
   },
 
   /**
