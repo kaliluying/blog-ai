@@ -380,13 +380,13 @@ onMounted(async () => {
 .comment-section {
   margin-top: 40px;
   padding-top: 24px;
-  border-top: 2px solid #34495e;
+  border-top: 2px solid var(--border-color);
 }
 
 .comment-title {
   font-family: 'Caveat', cursive;
   font-size: 1.5rem;
-  color: #2c3e50;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -438,8 +438,8 @@ onMounted(async () => {
 
 .comment-item {
   padding: 16px;
-  background: #fafafa;
-  border: 1px solid #e0e0e0;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
   border-radius: 6px 6px 3px 3px;
 }
 
@@ -452,17 +452,17 @@ onMounted(async () => {
 
 .comment-author {
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--text-primary);
 }
 
 .comment-date {
   font-size: 0.85rem;
-  color: #999;
+  color: var(--text-secondary);
 }
 
 .comment-content {
   line-height: 1.6;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .comment-actions {
@@ -474,8 +474,8 @@ onMounted(async () => {
 .reply-form {
   margin-top: 12px;
   padding: 12px;
-  background: #fff;
-  border: 1px dashed #ccc;
+  background: var(--card-bg);
+  border: 1px dashed var(--border-color);
   border-radius: 4px;
 }
 
@@ -488,13 +488,13 @@ onMounted(async () => {
 .replies {
   margin-top: 16px;
   padding-left: 24px;
-  border-left: 2px solid #ddd;
+  border-left: 2px solid var(--border-color);
 }
 
 .reply-item {
   padding: 12px;
-  background: #fff;
-  border: 1px solid #e0e0e0;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   margin-bottom: 12px;
 }
@@ -509,17 +509,18 @@ onMounted(async () => {
 .reply-author {
   font-weight: 600;
   font-size: 0.9rem;
-  color: #34495e;
+  color: var(--text-primary);
 }
 
 .reply-date {
   font-size: 0.8rem;
-  color: #999;
+  color: var(--text-secondary);
 }
 
 .reply-content {
   line-height: 1.5;
   font-size: 0.95rem;
+  color: var(--text-primary);
 }
 
 .reply-actions {
@@ -531,12 +532,12 @@ onMounted(async () => {
 .sub-replies {
   margin-top: 12px;
   padding-left: 16px;
-  border-left: 2px solid #eee;
+  border-left: 2px solid var(--border-color);
 }
 
 .sub-reply-item {
   padding: 8px;
-  background: #f8f8f8;
+  background: var(--card-bg);
   border-radius: 4px;
   margin-bottom: 8px;
 }
@@ -551,18 +552,18 @@ onMounted(async () => {
 .sub-reply-author {
   font-weight: 600;
   font-size: 0.85rem;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .sub-reply-date {
   font-size: 0.75rem;
-  color: #999;
+  color: var(--text-tertiary);
 }
 
 .sub-reply-content {
   line-height: 1.4;
   font-size: 0.9rem;
-  color: #555;
+  color: var(--text-primary);
 }
 
 .sub-reply-actions {

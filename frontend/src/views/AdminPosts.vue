@@ -404,12 +404,22 @@ watch(searchKeyword, () => {
 
 /* 标题链接样式 */
 :deep(.title-link) {
-  color: #2c3e50;
+  color: var(--text-primary);
   cursor: pointer;
   transition: color 0.2s;
 }
 
 :deep(.title-link:hover) {
   color: #3498db;
+}
+
+/* 暗黑模式适配 */
+:global(.dark) .admin-title {
+  color: var(--text-primary);
+}
+
+:global(.dark) .loading-state,
+:global(.dark) .empty-state {
+  color: var(--text-secondary);
 }
 </style>
