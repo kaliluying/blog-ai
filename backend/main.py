@@ -143,10 +143,6 @@ async def lifespan(app: FastAPI):
 # 从环境变量读取管理员密码
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
-# 旧版固定 token（用于兼容旧版本前端）
-# TODO: 在前端升级后移除此兼容逻辑
-ADMIN_TOKEN = "blog-admin-token"
-
 # 有效的管理员 session tokens（内存存储，生产环境建议用 Redis）
 valid_admin_tokens: set[str] = set()
 
@@ -164,10 +160,6 @@ async def verify_admin_password(password: str) -> bool:
 async def get_current_admin(request: Request) -> bool:
     """
     验证管理员身份
-    支持新版 session token 和旧版固定 token（向后兼容）
-
-    Note:
-        旧版固定 token 兼容将在后续版本移除
     """
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
@@ -179,8 +171,8 @@ async def get_current_admin(request: Request) -> bool:
 
     token = auth_header.replace("Bearer ", "")
 
-    # 验证 token（新版 session token 或旧版固定 token）
-    if token not in valid_admin_tokens and token != ADMIN_TOKEN:
+    # 验证 token
+    if token not in valid_admin_tokens:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="无效的管理员令牌",
