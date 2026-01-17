@@ -112,10 +112,7 @@
 
         <!-- 2. 公告卡片 -->
         <HandDrawnCard class="info-card">
-          <h3 class="info-title">
-            <HandDrawnIcon type="heart" :size="24" />
-            公告
-          </h3>
+          <SidebarCardTitle icon="heart">公告</SidebarCardTitle>
           <p class="notice-text">
             欢迎来到我的手绘博客！这里记录了我的学习笔记和生活感悟。
             如果有任何问题，欢迎留言交流。
@@ -124,10 +121,7 @@
 
         <!-- 3. 标签云卡片 -->
         <HandDrawnCard class="info-card">
-          <h3 class="info-title">
-            <HandDrawnIcon type="star" :size="24" />
-            标签云
-          </h3>
+          <SidebarCardTitle icon="star">标签云</SidebarCardTitle>
           <div class="tags-cloud">
             <n-tag v-for="tag in allTags" :key="tag" round size="small" class="tag-item" @click="goToTag(tag)">
               {{ tag }}
@@ -140,10 +134,7 @@
 
         <!-- 5. 最新文章卡片 -->
         <HandDrawnCard class="info-card">
-          <h3 class="info-title">
-            <HandDrawnIcon type="star" :size="24" />
-            最新文章
-          </h3>
+          <SidebarCardTitle icon="star">最新文章</SidebarCardTitle>
           <ul class="recent-posts">
             <li v-for="post in recentPosts" :key="post.id" class="recent-post-item" @click="readMore(post.id)">
               <span class="recent-post-title">{{ post.title }}</span>
@@ -154,10 +145,7 @@
 
         <!-- 6. 文章归档卡片 -->
         <HandDrawnCard class="info-card">
-          <h3 class="info-title">
-            <HandDrawnIcon type="star" :size="24" />
-            文章归档
-          </h3>
+          <SidebarCardTitle icon="star">文章归档</SidebarCardTitle>
           <ul class="archive-list">
             <li class="archive-item" @click="router.push('/archive')">
               <span class="archive-link">查看所有归档</span>
@@ -171,10 +159,7 @@
 
         <!-- 7. 网站统计卡片 -->
         <HandDrawnCard class="info-card">
-          <h3 class="info-title">
-            <HandDrawnIcon type="star" :size="24" />
-            网站统计
-          </h3>
+          <SidebarCardTitle icon="star">网站统计</SidebarCardTitle>
           <div class="stats-list">
             <div class="stat-item">
               <span class="stat-label">文章</span>
@@ -218,6 +203,7 @@ import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
 import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
 import PageDecorations from '@/components/PageDecorations.vue'
 import PopularPosts from '@/components/PopularPosts.vue'
+import SidebarCardTitle from '@/components/SidebarCardTitle.vue'
 
 // 导入共享工具函数
 import { formatDate, formatShortDate } from '@/utils/date'
@@ -251,7 +237,8 @@ const handlePageChange = (page: number) => {
  * 每页数量改变
  */
 const handlePageSizeChange = (size: number) => {
-  blogStore.fetchPosts(1, size)
+  blogStore.pageSize.value = size  // 先更新状态
+  blogStore.fetchPosts(1, size)    // 然后获取数据
 }
 
 // ========== 计算属性 ==========
@@ -444,17 +431,6 @@ const goToTag = (tag: string) => {
 
 .info-card {
   width: 100%;
-}
-
-.info-title {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-family: 'Caveat', cursive;
-  font-size: 1.5rem;
-  color: var(--text-primary);
-  margin: 0 0 16px 0;
 }
 
 .author-info {

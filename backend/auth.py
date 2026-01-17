@@ -7,8 +7,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import HTTPException, status
 from jose import JWTError, jwt
 from pwdlib import PasswordHash
 
@@ -19,9 +18,6 @@ load_dotenv()
 
 # 密码哈希器（使用推荐的 Argon2 算法）
 password_hash = PasswordHash.recommended()
-
-# OAuth2 认证路由
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 # JWT 配置
 SECRET_KEY = os.getenv("JWT_SECRET")

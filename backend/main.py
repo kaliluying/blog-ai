@@ -23,6 +23,7 @@ from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # 环境配置
@@ -64,6 +65,43 @@ class AdminLoginResponse(BaseModel):
     success: bool
     message: str
     token: str | None = None
+
+
+# ========== 评论频率限制 ==========
+
+from collections import defaultdict
+from time import time
+
+# 评论频率限制配置
+COMMENT_RATE_LIMIT = 5  # 最多评论次数
+COMMENT_RATE_WINDOW = 60  # 时间窗口（秒）
+
+# 记录每个 IP 的评论时间戳
+comment_rate_tracker: dict[str, list[float]] = defaultdict(list)
+
+
+def check_comment_rate_limit(client_ip: str) -> bool:
+    """
+    检查评论频率限制
+
+    Args:
+        client_ip: 客户端 IP
+
+    Returns:
+        bool: True 表示可以评论，False 表示超出限制
+    """
+    now = time()
+    # 清理过期的时间戳（保留窗口内的）
+    comment_rate_tracker[client_ip] = [
+        t for t in comment_rate_tracker[client_ip]
+        if now - t < COMMENT_RATE_WINDOW
+    ]
+    # 检查是否超出限制
+    if len(comment_rate_tracker[client_ip]) >= COMMENT_RATE_LIMIT:
+        return False
+    # 记录本次请求
+    comment_rate_tracker[client_ip].append(now)
+    return True
 
 
 from crud import (
@@ -374,6 +412,9 @@ async def search_articles(
 
 # ========== 评论路由 ==========
 
+# 评论回复最大递归深度，防止无限递归
+MAX_REPLY_DEPTH = 3
+
 
 @app.get("/api/posts/{post_id}/comments")
 async def get_comments(post_id: int, db: AsyncSession = Depends(get_db)):
@@ -387,14 +428,16 @@ async def get_comments(post_id: int, db: AsyncSession = Depends(get_db)):
         List[dict]: 评论列表（包含嵌套回复）
     """
 
-    async def get_replies_recursive(parent_id: int) -> list:
-        """递归获取所有层级的回复"""
+    async def get_replies_recursive(parent_id: int, depth: int = 0) -> list:
+        """递归获取所有层级的回复（带深度限制）"""
+        if depth >= MAX_REPLY_DEPTH:
+            return []
         replies = await get_comment_replies(db, parent_id)
         reply_list = []
         for reply in replies:
             reply_dict = comment_to_dict(reply, reply.nickname)
-            # 递归获取子回复
-            reply_dict["replies"] = await get_replies_recursive(reply.id)
+            # 递归获取子回复，传递深度参数
+            reply_dict["replies"] = await get_replies_recursive(reply.id, depth + 1)
             reply_list.append(reply_dict)
         return reply_list
 
@@ -418,6 +461,7 @@ async def get_comments(post_id: int, db: AsyncSession = Depends(get_db)):
 )
 async def create_comment_route(
     comment_data: CommentCreate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -434,6 +478,16 @@ async def create_comment_route(
 
     无需登录，任何人都可以发表评论
     """
+    # 获取客户端 IP
+    client_ip = request.headers.get("X-Real-IP", request.client.host)
+
+    # 检查频率限制
+    if not check_comment_rate_limit(client_ip):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="评论过于频繁，请稍后再试"
+        )
+
     # 验证文章是否存在
     post = await get_post_by_id(db, comment_data.post_id)
     if not post:
@@ -441,8 +495,6 @@ async def create_comment_route(
 
     # 验证父评论是否存在（如果提供了 parent_id）
     if comment_data.parent_id:
-        from sqlalchemy import select
-
         parent_result = await db.execute(
             select(Comment.id).where(Comment.id == comment_data.parent_id)
         )
@@ -482,8 +534,6 @@ async def delete_comment_route(
     await get_current_admin(request)
 
     # 获取评论
-    from sqlalchemy import select
-
     result = await db.execute(select(Comment).where(Comment.id == comment_id))
     comment = result.scalar_one_or_none()
 
@@ -505,7 +555,6 @@ async def get_posts_count(db: AsyncSession = Depends(get_db)):
     Returns:
         dict: 文章总数
     """
-    from sqlalchemy import select, func
     now = utc_now()
 
     result = await db.execute(

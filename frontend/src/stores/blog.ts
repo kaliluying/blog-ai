@@ -67,6 +67,32 @@ export const useBlogStore = defineStore('blog', () => {
    */
   const pageSize = ref(10)
 
+  // ========== 辅助函数 ==========
+
+  /**
+   * 设置加载状态
+   */
+  const setLoading = (isLoading: boolean) => {
+    loading.value = isLoading
+  }
+
+  /**
+   * 设置错误状态
+   */
+  const setError = (err: string, original?: Error) => {
+    error.value = err
+    originalError.value = original instanceof Error ? original : original ? new Error(String(original)) : null
+    console.error(original)
+  }
+
+  /**
+   * 重置错误状态
+   */
+  const resetError = () => {
+    error.value = null
+    originalError.value = null
+  }
+
   // ========== 方法定义 ==========
 
   /**
@@ -76,9 +102,8 @@ export const useBlogStore = defineStore('blog', () => {
    * 包含完整的错误处理。
    */
   const fetchPosts = async (page: number = 1, size: number = 10) => {
-    loading.value = true
-    error.value = null
-    originalError.value = null
+    setLoading(true)
+    resetError()
 
     currentPage.value = page
     pageSize.value = size
@@ -93,11 +118,9 @@ export const useBlogStore = defineStore('blog', () => {
       posts.value = postsData || []
       totalCount.value = typeof countData === 'number' ? countData : 0
     } catch (e) {
-      error.value = '获取文章列表失败'
-      originalError.value = e instanceof Error ? e : new Error(String(e))
-      console.error(e)
+      setError('获取文章列表失败', e instanceof Error ? e : new Error(String(e)))
     } finally {
-      loading.value = false
+      setLoading(false)
     }
   }
 
@@ -105,18 +128,15 @@ export const useBlogStore = defineStore('blog', () => {
    * 获取所有文章（不分页）
    */
   const fetchAllPosts = async (includeScheduled: boolean = false) => {
-    loading.value = true
-    error.value = null
-    originalError.value = null
+    setLoading(true)
+    resetError()
 
     try {
       posts.value = await blogApi.getPosts(0, 1000, includeScheduled)
     } catch (e) {
-      error.value = '获取文章列表失败'
-      originalError.value = e instanceof Error ? e : new Error(String(e))
-      console.error(e)
+      setError('获取文章列表失败', e instanceof Error ? e : new Error(String(e)))
     } finally {
-      loading.value = false
+      setLoading(false)
     }
   }
 
@@ -148,8 +168,8 @@ export const useBlogStore = defineStore('blog', () => {
    * @returns 文章数据或 null（获取失败时）
    */
   const fetchPostById = async (id: number): Promise<BlogPost | null> => {
-    loading.value = true
-    error.value = null
+    setLoading(true)
+    resetError()
 
     try {
       // 从后端获取文章详情
@@ -162,11 +182,10 @@ export const useBlogStore = defineStore('blog', () => {
 
       return post
     } catch (e) {
-      error.value = '获取文章失败'
-      console.error(e)
+      setError('获取文章失败', e instanceof Error ? e : new Error(String(e)))
       return null
     } finally {
-      loading.value = false
+      setLoading(false)
     }
   }
 

@@ -9,15 +9,21 @@
 import DOMPurify from 'dompurify'
 
 /**
+ * 允许的链接协议白名单
+ */
+const ALLOWED_PROTOCOLS = ['http:', 'https:']
+
+/**
  * 链接安全处理函数
  */
 const processLink = (_: string, text: string, url: string): string => {
   // 移除危险协议
-  const normalizedUrl = url.replace(/^\s*(javascript|data|vbscript):/gi, '')
+  const normalizedUrl = url.replace(/^\s*(javascript|data|vbscript|file|ftp):/gi, '')
   // 编码 URL 参数部分
   const safeUrl = encodeURI(normalizedUrl)
-  // 仅允许 http/https 链接
-  const isSafeProtocol = /^https?:\/\//i.test(safeUrl) || !/^[a-z]+:/i.test(normalizedUrl)
+  // 仅允许 http/https 链接，或没有协议的相对链接
+  const isSafeProtocol = ALLOWED_PROTOCOLS.some(p => normalizedUrl.startsWith(p)) ||
+                         !normalizedUrl.includes(':')
   const href = isSafeProtocol ? safeUrl : '#'
   return `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`
 }

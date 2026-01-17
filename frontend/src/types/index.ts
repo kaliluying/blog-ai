@@ -135,13 +135,6 @@ export interface ViewCountResponse {
 // ========== 管理员认证相关类型 ==========
 
 /**
- * 管理员登录请求类型
- */
-export interface AdminLoginRequest {
-  password: string
-}
-
-/**
  * 管理员登录响应类型
  */
 export interface AdminLoginResponse {

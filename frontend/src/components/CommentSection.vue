@@ -166,6 +166,9 @@ import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
 // 导入日期格式化工具
 import { formatDate } from '@/utils/date'
 
+// 导入昵称常量
+import { RANDOM_NICKNAMES, generateNickname } from '@/constants/nicknames'
+
 // ========== 组件接口定义 ==========
 
 /**
@@ -211,20 +214,6 @@ const replyingToParent = ref<number | null>(null)
 // 提交状态（控制按钮 loading）
 const submitting = ref(false)
 
-// ========== 常量定义 ==========
-
-/**
- * 随机昵称列表
- * 用于匿名用户自动生成昵称
- */
-const randomNicknames = [
-  '好奇的猫咪', '爱思考的云朵', '路过的旅人', '安静的观察者',
-  '快乐的星星', '温柔的微风', '勇敢的小鸟', '智慧的树洞',
-  '神秘的访客', '温暖的阳光', '自由的飞鸟', '善良的小熊',
-  '可爱的兔子', '机智的狐狸', '优雅的天鹅', '活泼的松鼠',
-  '沉稳的大象', '灵动的蝴蝶', '坚定的山峰', '清澈的溪流'
-]
-
 // ========== 计算属性 ==========
 
 /**
@@ -244,18 +233,6 @@ const canReplySubmit = computed(() => {
 })
 
 // ========== 方法定义 ==========
-
-/**
- * 生成随机昵称
- * 从预设列表中随机选择一个，并加上随机数字后缀
- *
- * @returns 生成的昵称字符串
- */
-const generateNickname = () => {
-  const randomIndex = Math.floor(Math.random() * randomNicknames.length)
-  const randomNum = Math.floor(Math.random() * 1000)
-  return `${randomNicknames[randomIndex]}${randomNum}`
-}
 
 /**
  * 重新生成昵称

@@ -6,10 +6,7 @@
 
 <template>
   <HandDrawnCard class="info-card">
-    <h3 class="info-title">
-      <HandDrawnIcon type="star" :size="24" />
-      热门文章
-    </h3>
+    <SidebarCardTitle icon="star">热门文章</SidebarCardTitle>
     <!-- 加载状态 -->
     <div v-if="loading" class="loading-state">
       <n-spin size="small" />
@@ -35,27 +32,35 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useBlogStore } from '@/stores/blog'
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
-import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
+import SidebarCardTitle from '@/components/SidebarCardTitle.vue'
 
 // ========== 组合式函数 ==========
 
 const router = useRouter()
 const blogStore = useBlogStore()
 
+// 本地加载状态（避免与其他操作共用全局状态）
+const localLoading = ref(false)
+
 // ========== 生命周期 ==========
 
-onMounted(() => {
-  blogStore.fetchPopularPosts(5)
+onMounted(async () => {
+  localLoading.value = true
+  try {
+    await blogStore.fetchPopularPosts(5)
+  } finally {
+    localLoading.value = false
+  }
 })
 
 // ========== 计算属性 ==========
 
 const posts = computed(() => blogStore.popularPosts)
-const loading = computed(() => blogStore.loading)
+const loading = computed(() => localLoading.value)
 
 // ========== 方法 ==========
 
@@ -67,17 +72,6 @@ const readMore = (id: number) => {
 <style scoped>
 .info-card {
   width: 100%;
-}
-
-.info-title {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-family: 'Caveat', cursive;
-  font-size: 1.5rem;
-  color: var(--text-primary);
-  margin: 0 0 16px 0;
 }
 
 .loading-state {

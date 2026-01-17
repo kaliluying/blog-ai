@@ -128,5 +128,6 @@ export const useAdminStore = defineStore('admin', () => {
   }
 })
 
-// 保持向后兼容，导出为 auth store
-export const useAuthStore = useAdminStore
+// 向后兼容别名：useAuthStore 与 useAdminStore 等价
+// 建议使用 useAdminStore 以保持命名一致性
+export { useAdminStore as useAuthStore }

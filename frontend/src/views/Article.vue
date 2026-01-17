@@ -277,14 +277,16 @@ const fetchPost = async () => {
     // 获取评论
     await fetchComments()
 
-    // 等待 DOM 更新后设置代码块复制按钮
+    // 等待 DOM 更新后设置代码块复制按钮和目录
     await nextTick()
-    // 延迟一下确保 v-html 完全渲染
-    setTimeout(() => {
-      setupCopyButtons(contentRef.value!)
-      extractHeadings()
-      setupScrollObserver()
-    }, 50)
+    // 使用 requestAnimationFrame 确保 DOM 完全渲染
+    requestAnimationFrame(() => {
+      if (contentRef.value) {
+        setupCopyButtons(contentRef.value)
+        extractHeadings()
+        setupScrollObserver()
+      }
+    })
 
     // 记录浏览并更新阅读量（在获取文章完成后调用）
     const newViewCount = await blogStore.recordAndGetViewCount(postId.value)
