@@ -15,19 +15,21 @@ Blog AI 后端 API 主入口文件
 
 # 标准库导入
 import json
+import os
 import secrets
+import time
+from collections import defaultdict
+from contextlib import asynccontextmanager
 from typing import List, Any
 
 # 第三方库导入
-from fastapi import FastAPI, Depends, HTTPException, status, Request
+from fastapi import FastAPI, Depends, HTTPException, status, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# 环境配置
-import os
 import dotenv
 
 # 加载 .env 环境变量
@@ -50,60 +52,6 @@ from schemas import (
     TitleCheckResponse,
 )
 
-from utils.time import utc_now
-
-
-# ========== 管理员认证 Pydantic 模型 ==========
-
-class AdminLoginRequest(BaseModel):
-    """管理员登录请求"""
-    password: str
-
-
-class AdminLoginResponse(BaseModel):
-    """管理员登录响应"""
-    success: bool
-    message: str
-    token: str | None = None
-
-
-# ========== 评论频率限制 ==========
-
-from collections import defaultdict
-from time import time
-
-# 评论频率限制配置
-COMMENT_RATE_LIMIT = 5  # 最多评论次数
-COMMENT_RATE_WINDOW = 60  # 时间窗口（秒）
-
-# 记录每个 IP 的评论时间戳
-comment_rate_tracker: dict[str, list[float]] = defaultdict(list)
-
-
-def check_comment_rate_limit(client_ip: str) -> bool:
-    """
-    检查评论频率限制
-
-    Args:
-        client_ip: 客户端 IP
-
-    Returns:
-        bool: True 表示可以评论，False 表示超出限制
-    """
-    now = time()
-    # 清理过期的时间戳（保留窗口内的）
-    comment_rate_tracker[client_ip] = [
-        t for t in comment_rate_tracker[client_ip]
-        if now - t < COMMENT_RATE_WINDOW
-    ]
-    # 检查是否超出限制
-    if len(comment_rate_tracker[client_ip]) >= COMMENT_RATE_LIMIT:
-        return False
-    # 记录本次请求
-    comment_rate_tracker[client_ip].append(now)
-    return True
-
-
 from crud import (
     get_posts,
     get_post_by_id,
@@ -125,7 +73,60 @@ from crud import (
     get_related_posts,
 )
 
-from contextlib import asynccontextmanager
+from utils.time import utc_now
+
+
+# ========== 管理员认证 Pydantic 模型 ==========
+
+class AdminLoginRequest(BaseModel):
+    """管理员登录请求"""
+    password: str
+
+
+class AdminLoginResponse(BaseModel):
+    """管理员登录响应"""
+    success: bool
+    message: str
+    token: str | None = None
+
+
+# ========== 评论频率限制 ==========
+
+# 评论频率限制配置
+COMMENT_RATE_LIMIT = 5  # 最多评论次数
+COMMENT_RATE_WINDOW = 60  # 时间窗口（秒）
+
+# 记录每个 IP 的评论时间戳
+comment_rate_tracker: dict[str, list[float]] = {}
+
+
+def check_comment_rate_limit(client_ip: str) -> bool:
+    """
+    检查评论频率限制
+
+    Args:
+        client_ip: 客户端 IP
+
+    Returns:
+        bool: True 表示可以评论，False 表示超出限制
+    """
+    now = time()
+
+    # 初始化或获取该 IP 的时间戳列表
+    if client_ip not in comment_rate_tracker:
+        comment_rate_tracker[client_ip] = []
+
+    # 清理过期的时间戳（保留窗口内的）
+    comment_rate_tracker[client_ip] = [
+        t for t in comment_rate_tracker[client_ip]
+        if now - t < COMMENT_RATE_WINDOW
+    ]
+    # 检查是否超出限制
+    if len(comment_rate_tracker[client_ip]) >= COMMENT_RATE_LIMIT:
+        return False
+    # 记录本次请求
+    comment_rate_tracker[client_ip].append(now)
+    return True
 
 
 @asynccontextmanager
@@ -409,12 +410,19 @@ MAX_REPLY_DEPTH = 3
 
 
 @app.get("/api/posts/{post_id}/comments")
-async def get_comments(post_id: int, db: AsyncSession = Depends(get_db)):
+async def get_comments(
+    post_id: int,
+    sort: str = Query(default="newest", regex="^(newest|oldest)$"),
+    db: AsyncSession = Depends(get_db),
+):
     """
     获取文章的评论列表
 
     Path Parameters:
         post_id: 文章 ID
+
+    Query Parameters:
+        sort: 排序方式，'newest' 最新优先（默认），'oldest' 最早优先
 
     Returns:
         List[dict]: 评论列表（包含嵌套回复）
@@ -434,7 +442,7 @@ async def get_comments(post_id: int, db: AsyncSession = Depends(get_db)):
         return reply_list
 
     # 获取顶级评论
-    comments = await get_comments_by_post(db, post_id)
+    comments = await get_comments_by_post(db, post_id, sort)
 
     result = []
     for comment in comments:
@@ -470,8 +478,14 @@ async def create_comment_route(
 
     无需登录，任何人都可以发表评论
     """
-    # 获取客户端 IP
-    client_ip = request.headers.get("X-Real-IP", request.client.host)
+    # 获取客户端 IP（只信任代理服务器设置的 X-Real-IP，不信任客户端直接传入的）
+    # 如果经过可信代理，取 X-Real-IP；否则取真实连接 IP
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    if forwarded:
+        # 取第一个 IP（原始客户端 IP）
+        client_ip = forwarded.split(",")[0].strip()
+    else:
+        client_ip = request.client.host
 
     # 检查频率限制
     if not check_comment_rate_limit(client_ip):
@@ -672,7 +686,11 @@ async def record_post_view_route(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文章不存在")
 
     # 获取真实 IP（处理代理情况）
-    client_ip = request.headers.get("X-Real-IP", request.client.host)
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+    else:
+        client_ip = request.client.host
 
     # 记录浏览
     counted = await record_post_view(db, post_id, client_ip)

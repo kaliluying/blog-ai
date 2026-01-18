@@ -3,7 +3,7 @@
 
   本组件提供文章评论功能，支持：
   1. 匿名评论（无需登录）
-  2. 多层级回复（支持二级回复）
+  2. 多层级回复（最多支持 3 级）
   3. 昵称自动生成与本地存储
   4. 管理员删除评论
   5. 评论刷新与实时更新
@@ -16,8 +16,17 @@
       评论 ({{ comments.length }})
     </h3>
 
+    <!-- 排序控制 -->
+    <div class="comment-sort">
+      <n-radio-group :value="sortOrder" size="small" @update:value="handleSortChange">
+        <n-radio-button value="newest">最新</n-radio-button>
+        <n-radio-button value="oldest">最早</n-radio-button>
+      </n-radio-group>
+    </div>
+
     <!-- 评论表单（匿名评论） -->
     <div class="comment-form">
+      <p class="comment-hint">支持 Markdown 格式，最多支持 3 级回复</p>
       <n-input v-model:value="newComment" type="textarea" placeholder="写下你的评论..." :rows="3" />
       <div class="form-actions">
         <div class="nickname-wrapper">
@@ -37,15 +46,20 @@
       <div v-for="comment in comments" :key="comment.id" class="comment-item">
         <div class="comment-header">
           <span class="comment-author">{{ comment.nickname }}</span>
-          <span class="comment-date">{{ formatDate(comment.created_at) }}</span>
+          <span class="comment-date">{{ formatTimeAgo(comment.created_at) }}</span>
         </div>
 
-        <div class="comment-content">{{ comment.content }}</div>
+        <div class="comment-content" v-html="renderMarkdownSafe(comment.content)"></div>
 
         <div class="comment-actions">
-          <n-button text size="small" @click="showReplyForm(comment.id)">
-            回复
-          </n-button>
+          <n-tooltip trigger="hover">
+            <template #trigger>
+              <n-button text size="small" @click="showReplyForm(comment.id)">
+                回复
+              </n-button>
+            </template>
+            最多支持 3 级回复
+          </n-tooltip>
           <n-popconfirm v-if="adminStore.isLoggedIn" positive-text="确认删除" negative-text="取消"
             @positive-click="handleDelete(comment.id)">
             确定要删除这条评论吗？
@@ -74,9 +88,9 @@
           <div v-for="reply in comment.replies" :key="reply.id" class="reply-item">
             <div class="reply-header">
               <span class="reply-author">{{ reply.nickname }}</span>
-              <span class="reply-date">{{ formatDate(reply.created_at) }}</span>
+              <span class="reply-date">{{ formatTimeAgo(reply.created_at) }}</span>
             </div>
-            <div class="reply-content">{{ reply.content }}</div>
+            <div class="reply-content" v-html="renderMarkdownSafe(reply.content)"></div>
             <div class="reply-actions">
               <n-button text size="small" @click="showReplyForm(reply.id, comment.id)">
                 回复
@@ -109,9 +123,9 @@
               <div v-for="subReply in reply.replies" :key="subReply.id" class="sub-reply-item">
                 <div class="sub-reply-header">
                   <span class="sub-reply-author">{{ subReply.nickname }}</span>
-                  <span class="sub-reply-date">{{ formatDate(subReply.created_at) }}</span>
+                  <span class="sub-reply-date">{{ formatTimeAgo(subReply.created_at) }}</span>
                 </div>
-                <div class="sub-reply-content">{{ subReply.content }}</div>
+                <div class="sub-reply-content" v-html="renderMarkdownSafe(subReply.content)"></div>
                 <div class="sub-reply-actions">
                   <n-popconfirm v-if="adminStore.isLoggedIn" positive-text="确认删除" negative-text="取消"
                     @positive-click="handleDelete(subReply.id)">
@@ -164,7 +178,10 @@ import type { Comment } from '@/types'
 import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
 
 // 导入日期格式化工具
-import { formatDate } from '@/utils/date'
+import { formatTimeAgo } from '@/utils/date'
+
+// 导入 Markdown 安全渲染
+import { renderMarkdownSafe } from '@/utils/markdown'
 
 // 导入昵称常量
 import { RANDOM_NICKNAMES, generateNickname } from '@/constants/nicknames'
@@ -175,15 +192,17 @@ import { RANDOM_NICKNAMES, generateNickname } from '@/constants/nicknames'
  * 组件属性
  */
 const props = defineProps<{
-  postId: number      // 文章 ID（必填）
-  comments: Comment[] // 评论列表（从父组件传入）
+  postId: number                    // 文章 ID（必填）
+  comments: Comment[]               // 评论列表（从父组件传入）
+  sortOrder: 'newest' | 'oldest'    // 排序方式
 }>()
 
 /**
  * 组件事件
  */
 const emit = defineEmits<{
-  (e: 'refresh'): void  // 刷新评论列表事件
+  (e: 'refresh'): void                         // 刷新评论列表事件
+  (e: 'sort-change', order: 'newest' | 'oldest'): void  // 排序变化事件
 }>()
 
 // ========== 组合式函数 ==========
@@ -213,6 +232,16 @@ const replyingToParent = ref<number | null>(null)
 
 // 提交状态（控制按钮 loading）
 const submitting = ref(false)
+
+// ========== 方法定义 ==========
+
+/**
+ * 处理排序方式变化
+ * @param order 新的排序方式
+ */
+const handleSortChange = async (order: 'newest' | 'oldest') => {
+  emit('sort-change', order)
+}
 
 // ========== 计算属性 ==========
 
@@ -289,10 +318,13 @@ const handleSubmit = async () => {
 
   submitting.value = true
   try {
+    // 截取最大长度防止超长
+    const safeNickname = nickname.value.trim().slice(0, 50)
+    const safeContent = newComment.value.trim()
     await commentApi.createComment({
       post_id: props.postId,
-      nickname: nickname.value.trim(),
-      content: newComment.value.trim()
+      nickname: safeNickname,
+      content: safeContent
     })
     // 保存昵称以便下次使用
     saveNickname(nickname.value)
@@ -301,7 +333,8 @@ const handleSubmit = async () => {
     message.success('评论发布成功~')
     // 通知父组件刷新评论列表
     emit('refresh')
-  } catch {
+  } catch (error) {
+    console.error('评论失败:', error)
     message.error('评论失败，请稍后重试')
   } finally {
     submitting.value = false
@@ -318,10 +351,13 @@ const handleReply = async (parentId: number) => {
 
   submitting.value = true
   try {
+    // 截取最大长度防止超长
+    const safeNickname = nickname.value.trim().slice(0, 50)
+    const safeContent = replyContent.value.trim()
     await commentApi.createComment({
       post_id: props.postId,
-      nickname: nickname.value.trim(),
-      content: replyContent.value.trim(),
+      nickname: safeNickname,
+      content: safeContent,
       parent_id: parentId
     })
     // 清空回复表单
@@ -330,7 +366,8 @@ const handleReply = async (parentId: number) => {
     replyingToParent.value = null
     message.success('回复发布成功~')
     emit('refresh')
-  } catch {
+  } catch (error) {
+    console.error('回复失败:', error)
     message.error('回复失败，请稍后重试')
   } finally {
     submitting.value = false
@@ -347,7 +384,8 @@ const handleDelete = async (commentId: number) => {
     await commentApi.deleteComment(commentId)
     message.success('评论已删除')
     emit('refresh')
-  } catch {
+  } catch (error) {
+    console.error('删除失败:', error)
     message.error('删除失败，请稍后重试')
   }
 }
@@ -390,11 +428,21 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+}
+
+.comment-sort {
+  margin-bottom: 20px;
 }
 
 .comment-form {
   margin-bottom: 24px;
+}
+
+.comment-hint {
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+  margin-bottom: 12px;
 }
 
 .form-actions {

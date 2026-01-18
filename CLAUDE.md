@@ -112,7 +112,7 @@ Views -> Pinia Store (blog.ts) -> blogApi (api/index.ts) -> FastAPI Backend
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
-| GET | `/api/posts` | List posts (?skip=&limit=) | No |
+| GET | `/api/posts` | List posts (?skip=&limit=&include_scheduled=) | No |
 | GET | `/api/posts/{id}` | Get single post | No |
 | POST | `/api/posts` | Create post | Admin |
 | PUT | `/api/posts/{id}` | Update post | Admin |
@@ -122,8 +122,8 @@ Views -> Pinia Store (blog.ts) -> blogApi (api/index.ts) -> FastAPI Backend
 | POST | `/api/posts/{id}/view` | Record view (IP-limited) | No |
 | GET | `/api/search?q=` | Search posts | No |
 | GET | `/api/archive` | Archives by year/month | No |
-| GET | `/api/posts/{id}/comments` | Get comments | No |
-| POST | `/api/comments` | Create comment | No |
+| GET | `/api/posts/{id}/comments` | Get comments (?sort=newest\|oldest) | No |
+| POST | `/api/comments` | Create comment (60s rate limit: 5 comments/IP) | No |
 | DELETE | `/api/comments/{id}` | Delete comment | Admin |
 
 ## Admin Authentication
@@ -154,7 +154,8 @@ DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/blog
 - **Composables**: Place in `frontend/src/composables/`
 - **Memory cleanup**: Return cleanup functions from `init()` methods and call on unmount
 - **Debouncing**: Use `useDebounceFn` from `@vueuse/core`
-- **Date formatting**: Use `formatDate` from `utils/date.ts`
+- **Date formatting**: Use `formatDate` and `formatTimeAgo` from `utils/date.ts`
+- **Markdown rendering**: Use `renderMarkdownSafe()` or `renderMarkdownWithCodeSafe()` with DOMPurify
 
 ## Theme System
 

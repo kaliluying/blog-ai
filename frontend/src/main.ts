@@ -43,21 +43,3 @@ themeStore.init()
 
 // 将应用挂载到 DOM 中的 #app 元素
 app.mount('#app')
-
-// 监听主题变化，更新 Naive UI 主题
-themeStore.$subscribe(() => {
-  const configProvider = document.querySelector('.n-config-provider') as HTMLElement & {
-    __vue_parent_app?: {
-      ctx: { config: { globalProperties: { $configProvider?: { theme: unknown } } } }
-    }
-  }
-  if (configProvider) {
-    const app = configProvider.__vue_parent_app
-    if (app && app.ctx && app.ctx.config && app.ctx.config.globalProperties) {
-      const provider = app.ctx.config.globalProperties.$configProvider
-      if (provider) {
-        provider.theme = themeStore.isDark ? darkTheme : null
-      }
-    }
-  }
-})

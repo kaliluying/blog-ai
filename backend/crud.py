@@ -263,12 +263,21 @@ async def search_posts(
 # ========== 评论相关 CRUD ==========
 
 
-async def get_comments_by_post(db: AsyncSession, post_id: int) -> List[Comment]:
-    """获取文章的所有顶级评论"""
+async def get_comments_by_post(db: AsyncSession, post_id: int, sort: str = "newest") -> List[Comment]:
+    """获取文章的所有顶级评论
+
+    Args:
+        db: 数据库会话
+        post_id: 文章 ID
+        sort: 排序方式，'newest' 最新优先（默认），'oldest' 最早优先
+    """
+    # 根据排序方式选择排序方向
+    order_func = Comment.created_at.desc() if sort == "newest" else Comment.created_at.asc()
+
     result = await db.execute(
         select(Comment)
         .where(Comment.post_id == post_id, Comment.parent_id.is_(None))
-        .order_by(Comment.created_at.desc())
+        .order_by(order_func)
     )
     return result.scalars().all()
 

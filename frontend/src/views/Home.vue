@@ -70,7 +70,7 @@
 
           <!-- 分页 -->
           <div v-if="totalCount > pageSize" class="pagination-wrapper">
-            <n-pagination v-model:page="currentPage" :page-count="Math.ceil(totalCount / pageSize)"
+            <n-pagination v-model:page="currentPage" :page-count="pageSize > 0 ? Math.ceil(totalCount / pageSize) : 0"
               :page-sizes="[5, 10, 20]" :page-size="pageSize" show-size-picker @update:page="handlePageChange"
               @update:page-size="handlePageSizeChange" />
           </div>
@@ -132,46 +132,6 @@
         <!-- 4. 热门文章卡片 -->
         <PopularPosts />
 
-        <!-- 5. 最新文章卡片 -->
-        <HandDrawnCard class="info-card">
-          <SidebarCardTitle icon="star">最新文章</SidebarCardTitle>
-          <ul class="recent-posts">
-            <li v-for="post in recentPosts" :key="post.id" class="recent-post-item" @click="readMore(post.id)">
-              <span class="recent-post-title">{{ post.title }}</span>
-              <span class="recent-post-date">{{ formatShortDate(post.date) }}</span>
-            </li>
-          </ul>
-        </HandDrawnCard>
-
-        <!-- 6. 文章归档卡片 -->
-        <HandDrawnCard class="info-card">
-          <SidebarCardTitle icon="star">文章归档</SidebarCardTitle>
-          <ul class="archive-list">
-            <li class="archive-item" @click="router.push('/archive')">
-              <span class="archive-link">查看所有归档</span>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" stroke-width="2">
-                <polyline points="9 18 15 12 9 6"></polyline>
-              </svg>
-            </li>
-          </ul>
-        </HandDrawnCard>
-
-        <!-- 7. 网站统计卡片 -->
-        <HandDrawnCard class="info-card">
-          <SidebarCardTitle icon="star">网站统计</SidebarCardTitle>
-          <div class="stats-list">
-            <div class="stat-item">
-              <span class="stat-label">文章</span>
-              <span class="stat-value">{{ posts.length }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">标签</span>
-              <span class="stat-value">{{ allTags.length }}</span>
-            </div>
-          </div>
-        </HandDrawnCard>
-
       </aside>
     </div>
   </div>
@@ -206,7 +166,7 @@ import PopularPosts from '@/components/PopularPosts.vue'
 import SidebarCardTitle from '@/components/SidebarCardTitle.vue'
 
 // 导入共享工具函数
-import { formatDate, formatShortDate } from '@/utils/date'
+import { formatDate } from '@/utils/date'
 
 // ========== 组合式函数 ==========
 
@@ -237,8 +197,8 @@ const handlePageChange = (page: number) => {
  * 每页数量改变
  */
 const handlePageSizeChange = (size: number) => {
-  blogStore.pageSize.value = size  // 先更新状态
-  blogStore.fetchPosts(1, size)    // 然后获取数据
+  blogStore.pageSize = size
+  blogStore.fetchPosts(1, size)
 }
 
 // ========== 计算属性 ==========
@@ -261,22 +221,9 @@ const pageSize = computed(() => blogStore.pageSize)
 const allTags = computed(() => {
   const tags = new Set<string>()
   posts.value.forEach((post: BlogPost) => {
-    const postTags = post.tags || []
-    postTags.forEach((tag: string) => tags.add(tag))
+    ; (post.tags || []).forEach((tag: string) => tags.add(tag))
   })
   return Array.from(tags)
-})
-
-/**
- * 获取最新文章（前 5 篇）
- * 按日期降序排序后取前 5 条
- */
-const recentPosts = computed(() => {
-  return [...posts.value]
-    // 按日期降序排序（最新的在前）
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    // 取前 5 篇
-    .slice(0, 5)
 })
 
 // ========== 方法 ==========
@@ -402,9 +349,9 @@ const goToTag = (tag: string) => {
   color: var(--text-primary);
   line-height: 1.6;
   margin-bottom: 16px;
-  /* 最多显示 3 行，超出隐藏 */
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -486,38 +433,6 @@ const goToTag = (tag: string) => {
   transform: translateY(-2px);
 }
 
-.social-link.bilibili:hover {
-  background: #00A1D6;
-}
-
-.stats-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.stat-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-}
-
-.stat-label {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-}
-
-.stat-value {
-  font-family: 'Caveat', cursive;
-  font-size: 1.3rem;
-  color: var(--text-primary);
-  font-weight: bold;
-}
-
 .notice-text {
   color: var(--text-secondary);
   line-height: 1.6;
@@ -538,81 +453,6 @@ const goToTag = (tag: string) => {
 
 .tag-item:hover {
   transform: scale(1.1) rotate(-2deg);
-}
-
-.recent-posts {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.recent-post-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px dashed var(--border-color);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.recent-post-item:last-child {
-  border-bottom: none;
-}
-
-.recent-post-item:hover {
-  padding-left: 8px;
-}
-
-.recent-post-title {
-  flex: 1;
-  font-size: 0.9rem;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.recent-post-date {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  margin-left: 12px;
-  flex-shrink: 0;
-}
-
-.archive-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.archive-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.archive-item:hover {
-  padding-left: 8px;
-}
-
-.archive-link {
-  font-size: 0.9rem;
-  color: var(--text-primary);
-}
-
-.archive-item:hover .archive-link {
-  color: #3498db;
-}
-
-.about-text {
-  color: var(--text-secondary);
-  line-height: 1.6;
-  margin: 0;
-  font-size: 0.95rem;
 }
 
 /* 响应式：小屏幕隐藏右侧 */

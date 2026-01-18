@@ -64,7 +64,7 @@ api.interceptors.request.use(
  *
  * 在请求响应后统一处理：
  * 1. 提取响应数据（response.data）
- * 2. 错误处理：静默处理 401（未授权），清除失效的 token，打印其他错误
+ * 2. 错误处理：统一错误格式，401 时清除 token 并可扩展通知用户
  */
 api.interceptors.response.use(
   // 成功响应：直接返回 data 部分
@@ -73,12 +73,24 @@ api.interceptors.response.use(
   // 错误响应
   (error: unknown) => {
     const axiosError = error as import('axios').AxiosError
+
     // 401 未授权 - 清除失效的 token
     if (axiosError.response?.status === 401) {
       localStorage.removeItem('adminToken')
+      // 可扩展：发送事件通知用户需要重新登录
+      // dispatch('auth/logout')
     }
-    console.error('API Error:', error)
-    return Promise.reject(error)
+
+    // 返回统一格式的错误信息
+    const errorMessage = axiosError.response?.data?.message ||
+      axiosError.message ||
+      '请求失败，请稍后重试'
+
+    return Promise.reject({
+      message: errorMessage,
+      status: axiosError.response?.status,
+      originalError: axiosError,
+    })
   },
 )
 
@@ -177,10 +189,11 @@ export const commentApi = {
   /**
    * 获取文章的评论列表
    * @param postId 文章 ID
+   * @param sort 排序方式：'newest' 最新优先，'oldest' 最早优先，默认 'newest'
    * @returns Promise<Comment[]> 评论列表
    */
-  getComments: async (postId: number): Promise<Comment[]> => {
-    return api.get(`/api/posts/${postId}/comments`)
+  getComments: async (postId: number, sort: 'newest' | 'oldest' = 'newest'): Promise<Comment[]> => {
+    return api.get(`/api/posts/${postId}/comments`, { params: { sort } })
   },
 
   /**

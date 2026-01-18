@@ -101,12 +101,12 @@ const router = createRouter({
 })
 
 // 路由守卫：检查管理页面访问权限
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const adminStore = useAdminStore()
 
   // 初始化 auth store（从 localStorage 恢复登录状态）
   if (!adminStore.initialized) {
-    adminStore.init()
+    await adminStore.init()
   }
 
   // 检查是否访问管理页面（排除登录页）

@@ -9,9 +9,10 @@
 - Markdown 文章编辑与渲染
 - 代码高亮与一键复制
 - 标签系统与文章归档
-- 匿名评论与嵌套回复
+- 匿名评论与嵌套回复（支持相对时间、排序）
 - 相关文章推荐
 - 全文搜索
+- 文章定时发布
 - 响应式设计
 
 ## 快速开始
@@ -69,6 +70,12 @@ npm run dev
 | `npm run format` | 使用 Prettier 格式化代码 |
 | `npm run test` | 运行测试 (监听模式) |
 | `npm run test:run` | 运行测试一次 |
+
+### 后端 API
+
+| 端点 | 描述 |
+|------|------|
+| `GET /api/posts/{id}/comments?sort=newest\|oldest` | 获取评论（支持排序） |
 
 ### 后端
 

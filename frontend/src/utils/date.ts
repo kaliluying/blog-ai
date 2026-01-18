@@ -35,3 +35,39 @@ export const formatShortDate = (date: string): string => {
     day: 'numeric'
   })
 }
+
+/**
+ * 相对时间格式化（如：3分钟前、2小时前、3天前）
+ * @param date ISO 日期字符串
+ * @returns 相对时间字符串
+ */
+export const formatTimeAgo = (date: string | null | undefined): string => {
+  if (!date) return '未知时间'
+  const now = new Date()
+  const past = new Date(date)
+  const diffMs = now.getTime() - past.getTime()
+  const diffSec = Math.floor(diffMs / 1000)
+  const diffMin = Math.floor(diffSec / 60)
+  const diffHour = Math.floor(diffMin / 60)
+  const diffDay = Math.floor(diffHour / 24)
+  const diffWeek = Math.floor(diffDay / 7)
+  const diffMonth = Math.floor(diffDay / 30)
+  const diffYear = Math.floor(diffDay / 365)
+
+  if (diffSec < 60) {
+    return '刚刚'
+  } else if (diffMin < 60) {
+    return `${diffMin}分钟前`
+  } else if (diffHour < 24) {
+    return `${diffHour}小时前`
+  } else if (diffDay < 7) {
+    return `${diffDay}天前`
+  } else if (diffDay < 30) {
+    // 7-29天显示为周（避免28天显示为4周而不是1个月）
+    return `${diffWeek}周前`
+  } else if (diffMonth < 12) {
+    return `${diffMonth}个月前`
+  } else {
+    return `${diffYear}年前`
+  }
+}

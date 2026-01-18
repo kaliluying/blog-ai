@@ -67,7 +67,13 @@
             <RelatedPosts v-if="post && post.tags && post.tags.length > 0" :post-id="post.id" :tags="post.tags" />
 
             <!-- 评论区域 -->
-            <CommentSection :post-id="postId" :comments="comments" @refresh="fetchComments" />
+            <CommentSection
+              :post-id="postId"
+              :comments="comments"
+              :sort-order="commentSortOrder"
+              @refresh="fetchComments"
+              @sort-change="handleCommentSortChange"
+            />
           </div>
 
           <!-- 右侧：目录和侧边栏 -->
@@ -167,6 +173,9 @@ const error = ref<string | null>(null)
 // 评论列表
 const comments = ref<Comment[]>([])
 
+// 评论排序方式
+const commentSortOrder = ref<'newest' | 'oldest'>('newest')
+
 // 目录标题列表
 const headings = ref<Array<{ id: string; text: string; level: number }>>([])
 
@@ -255,11 +264,19 @@ const cleanupScrollObserver = () => {
  */
 const fetchComments = async () => {
   try {
-    comments.value = await commentApi.getComments(postId.value)
+    comments.value = await commentApi.getComments(postId.value, commentSortOrder.value)
   } catch (e) {
     console.error('获取评论失败:', e)
     comments.value = []
   }
+}
+
+/**
+ * 处理评论排序变化
+ */
+const handleCommentSortChange = (order: 'newest' | 'oldest') => {
+  commentSortOrder.value = order
+  fetchComments()
 }
 
 /**
