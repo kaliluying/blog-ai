@@ -20,13 +20,42 @@ load_dotenv()
 password_hash = PasswordHash.recommended()
 
 # JWT 配置
-SECRET_KEY = os.getenv("JWT_SECRET")
+SECRET_KEY: str = os.getenv("JWT_SECRET", "")
 if not SECRET_KEY:
-    raise ValueError("JWT_SECRET environment variable must be set")
+    # 使用安全的默认密钥（仅开发环境使用）
+    import secrets
+
+    SECRET_KEY = secrets.token_hex(32)
+    import warnings
+
+    warnings.warn(
+        "JWT_SECRET not set, using auto-generated secret key. "
+        "Set JWT_SECRET in .env for production use.",
+        UserWarning,
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(
     os.getenv("JWT_EXPIRE_MINUTES", "1440")
 )  # 默认 24 小时
+
+# 管理员密码
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH")  # 可选的预哈希密码
+
+
+def verify_admin_password(password: str) -> bool:
+    """验证管理员密码
+
+    支持两种验证方式：
+    1. 如果设置了 ADMIN_PASSWORD_HASH，使用 Argon2 哈希验证
+    2. 否则使用明文比较（向后兼容）
+    """
+    if ADMIN_PASSWORD_HASH:
+        # 使用 Argon2 哈希验证
+        return password_hash.verify(password, ADMIN_PASSWORD_HASH)
+    else:
+        # 明文比较（向后兼容）
+        return password == ADMIN_PASSWORD
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -44,7 +73,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     创建 JWT 访问令牌
 
     Args:
-        data: 要编码的数据（包含 sub 即用户 ID）
+        data: 要编码的数据
         expires_delta: 过期时间增量
 
     Returns:
@@ -59,7 +88,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(
+            minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+        )
 
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -88,3 +119,31 @@ def decode_token(token: str) -> dict:
             detail="无效的认证令牌",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+def verify_admin_token(token: str) -> bool:
+    """
+    验证管理员 JWT 令牌
+
+    Args:
+        token: JWT 令牌字符串
+
+    Returns:
+        bool: 令牌有效返回 True，无效返回 False
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        # 检查是否是管理员令牌
+        return payload.get("type") == "admin"
+    except JWTError:
+        return False
+
+
+def create_admin_token() -> str:
+    """
+    创建管理员 JWT 令牌
+
+    Returns:
+        str: JWT 管理员令牌
+    """
+    return create_access_token({"sub": "admin", "type": "admin"})

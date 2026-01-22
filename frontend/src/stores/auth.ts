@@ -92,15 +92,9 @@ export const useAdminStore = defineStore('admin', () => {
 
   /**
    * 管理员登出
+   * JWT 是无状态的，只需移除客户端 token
    */
   const logout = async () => {
-    // 调用后端登出接口使 token 失效
-    try {
-      await adminApi.logout()
-    } catch {
-      // 忽略登出接口错误
-    }
-
     token.value = null
     localStorage.removeItem('adminToken')
     router.push('/')

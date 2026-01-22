@@ -21,6 +21,8 @@ import type {
   ArchiveYear,
   ViewCountResponse,
   AdminLoginResponse,
+  DashboardStats,
+  AdminCommentsResponse,
 } from '@/types'
 
 /**
@@ -82,7 +84,8 @@ api.interceptors.response.use(
     }
 
     // 返回统一格式的错误信息
-    const errorMessage = axiosError.response?.data?.message ||
+    const errorData = axiosError.response?.data as Record<string, unknown> | undefined
+    const errorMessage = (errorData?.message as string) ||
       axiosError.message ||
       '请求失败，请稍后重试'
 
@@ -286,6 +289,79 @@ export const adminApi = {
    */
   logout: async (): Promise<void> => {
     return api.post('/api/admin/logout')
+  },
+
+  /**
+   * 获取仪表盘统计数据
+   * @returns Promise<DashboardStats> 包含文章数、评论数、总阅读量等
+   */
+  getStats: async (): Promise<DashboardStats> => {
+    return api.get('/api/admin/stats')
+  },
+
+  /**
+   * 获取所有评论（管理后台）
+   * @param skip 跳过的记录数
+   * @param limit 返回数量限制
+   * @param postId 按文章 ID 筛选
+   * @param keyword 按昵称或内容搜索
+   * @returns Promise<AdminCommentsResponse> 评论列表
+   */
+  getComments: async (
+    skip: number = 0,
+    limit: number = 50,
+    postId?: number,
+    keyword?: string
+  ): Promise<AdminCommentsResponse> => {
+    return api.get('/api/admin/comments', {
+      params: { skip, limit, post_id: postId, keyword }
+    })
+  },
+
+  /**
+   * 删除评论（管理后台）
+   * @param commentId 评论 ID
+   * @returns Promise<void>
+   */
+  deleteComment: async (commentId: number): Promise<void> => {
+    return api.delete(`/api/comments/${commentId}`)
+  },
+}
+
+// ========== 设置 API ==========
+
+export interface SettingItem {
+  key: string
+  value: string
+  description?: string
+}
+
+export interface SettingsResponse {
+  settings: SettingItem[]
+}
+
+export const settingsApi = {
+  /**
+   * 获取所有设置
+   * @returns Promise<SettingsResponse> 设置列表
+   */
+  getSettings: async (): Promise<SettingsResponse> => {
+    return api.get('/api/admin/settings')
+  },
+
+  /**
+   * 创建或更新设置
+   * @param key 设置键
+   * @param value 设置值
+   * @param description 设置描述（可选）
+   * @returns Promise<SettingItem> 更新后的设置
+   */
+  updateSetting: async (
+    key: string,
+    value: string,
+    description?: string
+  ): Promise<SettingItem> => {
+    return api.post('/api/admin/settings', { key, value, description })
   },
 }
 

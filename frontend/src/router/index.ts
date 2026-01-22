@@ -12,24 +12,53 @@ import { useAdminStore } from '@/stores/auth'
 // 需要管理员权限的路由
 const adminRoutes: RouteRecordRaw[] = [
   {
+    path: '/admin',
+    component: () => import('@/views/AdminLayout.vue'),
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'AdminDashboard',
+        component: () => import('@/views/AdminDashboard.vue')
+      },
+      {
+        path: 'comments',
+        name: 'AdminComments',
+        component: () => import('@/views/AdminComments.vue')
+      },
+      {
+        path: 'settings',
+        name: 'AdminSettings',
+        component: () => import('@/views/AdminSettings.vue')
+      }
+    ]
+  },
+  {
     path: '/admin/login',
     name: 'AdminLogin',
     component: () => import('@/views/AdminLogin.vue')
   },
   {
     path: '/admin/posts',
-    name: 'AdminPosts',
-    component: () => import('@/views/AdminPosts.vue')
-  },
-  {
-    path: '/admin/posts/new',
-    name: 'AdminPostNew',
-    component: () => import('@/views/AdminPostNew.vue')
-  },
-  {
-    path: '/admin/posts/:id',
-    name: 'AdminPostEdit',
-    component: () => import('@/views/AdminPostNew.vue')
+    component: () => import('@/views/AdminLayout.vue'),
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'AdminPosts',
+        component: () => import('@/views/AdminPosts.vue')
+      },
+      {
+        path: 'new',
+        name: 'AdminPostNew',
+        component: () => import('@/views/AdminPostNew.vue')
+      },
+      {
+        path: ':id',
+        name: 'AdminPostEdit',
+        component: () => import('@/views/AdminPostNew.vue')
+      }
+    ]
   }
 ]
 

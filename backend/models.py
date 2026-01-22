@@ -45,6 +45,7 @@ class Comment(Base):
     - created_at: 创建时间
     - updated_at: 更新时间
     """
+
     __tablename__ = "comments"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -52,8 +53,12 @@ class Comment(Base):
     nickname: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     parent_id: Mapped[int | None] = mapped_column(nullable=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
 
     def __repr__(self):
         return f"<Comment(id={self.id}, post_id={self.post_id}, nickname='{self.nickname}')>"
@@ -76,6 +81,7 @@ class BlogPost(Base):
     - updated_at: 更新时间（更新时自动刷新）
     - view_count: 阅读量
     """
+
     __tablename__ = "blog_posts"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -84,9 +90,15 @@ class BlogPost(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     tags: Mapped[List[str]] = mapped_column(JSON, default=list)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
-    view_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+    view_count: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
 
     def __repr__(self):
         """
@@ -96,3 +108,29 @@ class BlogPost(Base):
             str: 格式化的对象描述
         """
         return f"<BlogPost(id={self.id}, title='{self.title}')>"
+
+
+class SiteSettings(Base):
+    """
+    站点设置模型
+
+    对应数据库表：site_settings
+
+    用于存储博客的配置信息，如评论频率限制等。
+    """
+
+    __tablename__ = "site_settings"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    key: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    value: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+    def __repr__(self):
+        return f"<SiteSettings(key='{self.key}', value='{self.value}')>"

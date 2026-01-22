@@ -16,11 +16,11 @@ Blog AI 后端 API 主入口文件
 # 标准库导入
 import json
 import os
-import secrets
 import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
-from typing import List, Any
+from datetime import datetime
+from typing import Any, List
 
 # 第三方库导入
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Query
@@ -50,6 +50,9 @@ from schemas import (
     ArchiveYear,
     TitleCheckRequest,
     TitleCheckResponse,
+    SettingItem,
+    SettingUpdate,
+    SettingsResponse,
 )
 
 from crud import (
@@ -71,20 +74,36 @@ from crud import (
     get_post_view_count,
     check_post_title_exists,
     get_related_posts,
+    get_all_comments,
+    get_comments_count,
+    get_dashboard_stats,
+    get_monthly_posts_stats,
+    get_setting,
+    set_setting,
+    get_all_settings,
 )
 
+from auth import (
+    create_access_token,
+    create_admin_token,
+    verify_admin_password,
+    verify_admin_token,
+)
 from utils.time import utc_now
 
 
 # ========== 管理员认证 Pydantic 模型 ==========
 
+
 class AdminLoginRequest(BaseModel):
     """管理员登录请求"""
+
     password: str
 
 
 class AdminLoginResponse(BaseModel):
     """管理员登录响应"""
+
     success: bool
     message: str
     token: str | None = None
@@ -98,6 +117,52 @@ COMMENT_RATE_WINDOW = 60  # 时间窗口（秒）
 
 # 记录每个 IP 的评论时间戳
 comment_rate_tracker: dict[str, list[float]] = {}
+
+# 可信代理 IP 列表（从环境变量读取，多个用逗号分隔）
+# 仅当请求来自这些 IP 时，才信任 X-Forwarded-For 头
+TRUSTED_PROXIES = os.getenv(
+    "TRUSTED_PROXIES", "127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+).split(",")
+
+
+def get_client_ip(request: Request) -> str:
+    """
+    安全获取客户端真实 IP
+
+    防止 IP 欺骗攻击：
+    - 仅信任来自可信代理的 X-Forwarded-For 头
+    - 对于来自不可信来源的请求，使用直接连接 IP
+
+    Args:
+        request: FastAPI 请求对象
+
+    Returns:
+        str: 客户端 IP 地址
+    """
+    # 获取直接连接 IP
+    direct_ip = request.client.host if request.client else None
+
+    # 检查 X-Forwarded-For 头
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    if forwarded:
+        # 提取第一个 IP（原始客户端 IP）
+        client_ip = forwarded.split(",")[0].strip()
+
+        # 验证直接连接 IP 是否在可信代理列表中
+        if direct_ip and any(
+            direct_ip == proxy
+            or (
+                proxy.endswith("/") and direct_ip.startswith(proxy.rstrip("/"))
+            )  # CIDR 格式
+            for proxy in TRUSTED_PROXIES
+        ):
+            # 信任 X-Forwarded-For，返回原始客户端 IP
+            return client_ip
+        else:
+            # 来自不可信来源，忽略 X-Forwarded-For，使用直接连接 IP
+            return direct_ip or client_ip
+
+    return direct_ip or "0.0.0.0"
 
 
 def check_comment_rate_limit(client_ip: str) -> bool:
@@ -118,8 +183,7 @@ def check_comment_rate_limit(client_ip: str) -> bool:
 
     # 清理过期的时间戳（保留窗口内的）
     comment_rate_tracker[client_ip] = [
-        t for t in comment_rate_tracker[client_ip]
-        if now - t < COMMENT_RATE_WINDOW
+        t for t in comment_rate_tracker[client_ip] if now - t < COMMENT_RATE_WINDOW
     ]
     # 检查是否超出限制
     if len(comment_rate_tracker[client_ip]) >= COMMENT_RATE_LIMIT:
@@ -135,32 +199,21 @@ async def lifespan(app: FastAPI):
     应用生命周期事件处理器
 
     数据库迁移由 Alembic 管理（migrations/ 目录）
+    初始化默认设置
     """
     yield
 
 
 # ========== 管理员认证依赖 ==========
 
-# 从环境变量读取管理员密码
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
-
-# 有效的管理员 session tokens（内存存储，生产环境建议用 Redis）
-valid_admin_tokens: set[str] = set()
-
-
-def generate_admin_token() -> str:
-    """生成管理员 session token"""
-    return f"admin_{secrets.token_hex(32)}"
-
-
-async def verify_admin_password(password: str) -> bool:
-    """验证管理员密码"""
-    return password == ADMIN_PASSWORD
+# 使用 auth 模块中的 verify_admin_password 和 create_admin_token
 
 
 async def get_current_admin(request: Request) -> bool:
     """
-    验证管理员身份
+    验证管理员身份（JWT 无状态认证）
+
+    从请求头中提取 JWT 令牌并验证。
     """
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
@@ -172,8 +225,8 @@ async def get_current_admin(request: Request) -> bool:
 
     token = auth_header.replace("Bearer ", "")
 
-    # 验证 token
-    if token not in valid_admin_tokens:
+    # 验证 JWT 令牌
+    if not verify_admin_token(token):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="无效的管理员令牌",
@@ -198,8 +251,7 @@ app = FastAPI(
 # CORS（跨域资源共享）中间件配置
 # 从环境变量读取允许的源，多个源用逗号分隔
 CORS_ORIGINS = os.getenv(
-    "CORS_ORIGINS", 
-    "http://localhost:5173,http://127.0.0.1:5173"
+    "CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
 ).split(",")
 
 app.add_middleware(
@@ -219,7 +271,7 @@ async def admin_login(request_body: AdminLoginRequest):
     """
     管理员登录
 
-    验证密码后返回 session token。
+    验证密码后返回 JWT token。
 
     Request Body:
         password: 管理员密码（从环境变量 ADMIN_PASSWORD 读取）
@@ -230,42 +282,23 @@ async def admin_login(request_body: AdminLoginRequest):
     password = request_body.password
 
     if not password:
-        return AdminLoginResponse(
-            success=False,
-            message="请输入密码",
-            token=None
-        )
+        return AdminLoginResponse(success=False, message="请输入密码", token=None)
 
-    if password == ADMIN_PASSWORD:
-        # 生成新的 session token
-        token = generate_admin_token()
-        valid_admin_tokens.add(token)
-
-        return AdminLoginResponse(
-            success=True,
-            message="登录成功",
-            token=token
-        )
+    # 验证密码并返回 JWT token
+    if verify_admin_password(password):
+        token = create_admin_token()
+        return AdminLoginResponse(success=True, message="登录成功", token=token)
     else:
-        return AdminLoginResponse(
-            success=False,
-            message="密码错误",
-            token=None
-        )
+        return AdminLoginResponse(success=False, message="密码错误", token=None)
 
 
 @app.post("/api/admin/logout")
-async def admin_logout(request: Request):
+async def admin_logout():
     """
     管理员登出
 
-    使当前 session token 失效。
+    JWT 是无状态的，登出由客户端移除 token。
     """
-    auth_header = request.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header.replace("Bearer ", "")
-        valid_admin_tokens.discard(token)
-
     return {"message": "已登出"}
 
 
@@ -317,16 +350,16 @@ def post_to_dict(post: BlogPost) -> dict:
     }
 
 
-def post_to_list_item(post: BlogPost) -> dict:
+def post_to_list_item(post: BlogPost) -> BlogPostListItem:
     """将 BlogPost ORM 模型转换为列表项"""
-    return {
-        "id": post.id,
-        "title": post.title,
-        "excerpt": post.excerpt,
-        "date": post.date,
-        "tags": parse_post_tags(post),
-        "view_count": post.view_count,
-    }
+    return BlogPostListItem(
+        id=post.id,
+        title=post.title,
+        excerpt=post.excerpt,
+        date=post.date,
+        tags=parse_post_tags(post),
+        view_count=post.view_count,
+    )
 
 
 def comment_to_dict(comment: Comment, nickname: str | None = None) -> dict:
@@ -342,9 +375,15 @@ def comment_to_dict(comment: Comment, nickname: str | None = None) -> dict:
     }
 
 
+from typing import Any, TypedDict
+
+
+from typing import Any, List, cast
+
+
 def group_posts_by_month(posts: List[BlogPost], year: int) -> List[ArchiveGroup]:
     """将文章列表按月份分组"""
-    months_data: dict[int, list[dict]] = {}
+    months_data: dict[int, list[BlogPostListItem]] = {}
 
     for post in posts:
         post_date = post.date if hasattr(post.date, "month") else post.date.month
@@ -383,9 +422,11 @@ def group_posts_by_month(posts: List[BlogPost], year: int) -> List[ArchiveGroup]
 
 @app.get("/api/search", response_model=List[SearchResult])
 async def search_articles(
-    q: str, skip: int = 0, limit: int = 50,
+    q: str,
+    skip: int = 0,
+    limit: int = 50,
     include_scheduled: bool = False,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     搜索文章
@@ -399,7 +440,9 @@ async def search_articles(
     Returns:
         List[SearchResult]: 搜索结果列表
     """
-    posts = await search_posts(db, query=q, skip=skip, limit=limit, include_scheduled=include_scheduled)
+    posts = await search_posts(
+        db, query=q, skip=skip, limit=limit, include_scheduled=include_scheduled
+    )
     return [post_to_dict(p) for p in posts]
 
 
@@ -412,7 +455,7 @@ MAX_REPLY_DEPTH = 3
 @app.get("/api/posts/{post_id}/comments")
 async def get_comments(
     post_id: int,
-    sort: str = Query(default="newest", regex="^(newest|oldest)$"),
+    sort: str = Query(default="newest", pattern="^(newest|oldest)$"),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -478,20 +521,14 @@ async def create_comment_route(
 
     无需登录，任何人都可以发表评论
     """
-    # 获取客户端 IP（只信任代理服务器设置的 X-Real-IP，不信任客户端直接传入的）
-    # 如果经过可信代理，取 X-Real-IP；否则取真实连接 IP
-    forwarded = request.headers.get("X-Forwarded-For", "")
-    if forwarded:
-        # 取第一个 IP（原始客户端 IP）
-        client_ip = forwarded.split(",")[0].strip()
-    else:
-        client_ip = request.client.host
+    # 安全获取客户端 IP
+    client_ip = get_client_ip(request)
 
     # 检查频率限制
     if not check_comment_rate_limit(client_ip):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="评论过于频繁，请稍后再试"
+            detail="评论过于频繁，请稍后再试",
         )
 
     # 验证文章是否存在
@@ -573,9 +610,10 @@ async def get_posts_count(db: AsyncSession = Depends(get_db)):
 
 @app.get("/api/posts")
 async def list_posts(
-    skip: int = 0, limit: int = 100,
+    skip: int = 0,
+    limit: int = 100,
     include_scheduled: bool = False,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     获取文章列表
@@ -588,16 +626,16 @@ async def list_posts(
     Returns:
         List[dict]: 文章列表，每篇文章包含基本信息
     """
-    posts = await get_posts(db, skip=skip, limit=limit, include_scheduled=include_scheduled)
+    posts = await get_posts(
+        db, skip=skip, limit=limit, include_scheduled=include_scheduled
+    )
     # 将 ORM 模型列表转换为字典列表
     return [post_to_dict(p) for p in posts]
 
 
 @app.get("/api/posts/popular")
 async def get_popular_posts_route(
-    limit: int = 5,
-    include_scheduled: bool = False,
-    db: AsyncSession = Depends(get_db)
+    limit: int = 5, include_scheduled: bool = False, db: AsyncSession = Depends(get_db)
 ):
     """
     获取热门文章排行
@@ -609,7 +647,9 @@ async def get_popular_posts_route(
     Returns:
         List[dict]: 热门文章列表
     """
-    posts = await get_popular_posts(db, limit=limit, include_scheduled=include_scheduled)
+    posts = await get_popular_posts(
+        db, limit=limit, include_scheduled=include_scheduled
+    )
     return [post_to_list_item(p) for p in posts]
 
 
@@ -638,31 +678,42 @@ async def get_related_posts_route(
     post_id: int,
     limit: int = 5,
     include_scheduled: bool = False,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
-    """
-    获取相关文章推荐
+    """获取相关文章推荐"""
+    try:
+        post = await get_post_by_id(db, post_id)
+        if post is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="文章不存在"
+            )
 
-    Path Parameters:
-        post_id: 当前文章 ID
+        # 安全获取 tags
+        tags = parse_post_tags(post)
+        if not tags:
+            return []
 
-    Query Parameters:
-        limit: 返回数量限制，默认 5
-        include_scheduled: 是否包含定时发布的文章
+        related = await get_related_posts(db, post_id, tags, limit, include_scheduled)
 
-    Returns:
-        List[dict]: 相关文章列表
-    """
-    post = await get_post_by_id(db, post_id)
-    if post is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文章不存在")
+        # 直接返回 BlogPost 对象的字典形式
+        return [
+            {
+                "id": p.id,
+                "title": p.title,
+                "excerpt": p.excerpt,
+                "date": p.date,
+                "tags": parse_post_tags(p),
+                "view_count": p.view_count,
+            }
+            for p in related
+        ]
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
 
-    tags = parse_post_tags(post)
-    if not tags:
-        return []
-
-    related = await get_related_posts(db, post_id, tags, limit, include_scheduled)
-    return [post_to_list_item(p) for p in related]
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/posts/{post_id}/view")
@@ -685,12 +736,8 @@ async def record_post_view_route(
     if post is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文章不存在")
 
-    # 获取真实 IP（处理代理情况）
-    forwarded = request.headers.get("X-Forwarded-For", "")
-    if forwarded:
-        client_ip = forwarded.split(",")[0].strip()
-    else:
-        client_ip = request.client.host
+    # 安全获取客户端 IP
+    client_ip = get_client_ip(request)
 
     # 记录浏览
     counted = await record_post_view(db, post_id, client_ip)
@@ -723,25 +770,20 @@ async def check_post_title(
     await get_current_admin(request)
 
     try:
-        exists = await check_post_title_exists(db, request_body.title, request_body.exclude_id)
+        exists = await check_post_title_exists(
+            db, request_body.title, request_body.exclude_id
+        )
 
         if exists:
             return TitleCheckResponse(
                 exists=True,
-                message=f"标题「{request_body.title}」已存在，请使用其他标题"
+                message=f"标题「{request_body.title}」已存在，请使用其他标题",
             )
         else:
-            return TitleCheckResponse(
-                exists=False,
-                message="标题可以使用"
-            )
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return TitleCheckResponse(
-            exists=False,
-            message=f"检查失败: {str(e)}"
-        )
+            return TitleCheckResponse(exists=False, message="标题可以使用")
+    except Exception:
+        # 移除详细错误信息，防止敏感信息泄露
+        return TitleCheckResponse(exists=False, message="检查失败，请稍后重试")
 
 
 @app.post("/api/posts", status_code=status.HTTP_201_CREATED)
@@ -848,8 +890,7 @@ async def delete_existing_post(
 
 @app.get("/api/archive", response_model=List[ArchiveYear])
 async def get_archive_list(
-    include_scheduled: bool = False,
-    db: AsyncSession = Depends(get_db)
+    include_scheduled: bool = False, db: AsyncSession = Depends(get_db)
 ):
     """
     获取文章归档列表
@@ -940,6 +981,136 @@ async def get_archive_by_year_month_route(
         month_name=MONTH_NAMES.get(month, str(month)),
         post_count=len(posts),
         posts=[post_to_list_item(p) for p in posts],
+    )
+
+
+# ========== 管理后台路由 ==========
+
+
+@app.get("/api/admin/stats")
+async def get_admin_stats(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    获取仪表盘统计数据
+
+    Returns:
+        dict: 包含文章数、评论数、总阅读量、定时文章数的统计信息
+
+    Requires Admin Authentication
+    """
+    await get_current_admin(request)
+
+    stats = await get_dashboard_stats(db)
+    monthly_posts = await get_monthly_posts_stats(db, months=6)
+
+    return {**stats, "monthly_posts": monthly_posts}
+
+
+@app.get("/api/admin/comments")
+async def get_admin_comments(
+    request: Request,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    post_id: int | None = Query(None, ge=1),
+    keyword: str | None = Query(None, max_length=100),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    获取所有评论（管理后台）
+
+    Query Parameters:
+        skip: 跳过的记录数
+        limit: 返回数量限制
+        post_id: 按文章 ID 筛选
+        keyword: 按昵称或内容搜索
+
+    Returns:
+        list: 评论列表（含文章标题信息）
+
+    Requires Admin Authentication
+    """
+    await get_current_admin(request)
+
+    comments = await get_all_comments(
+        db, skip=skip, limit=limit, post_id=post_id, keyword=keyword
+    )
+    total = await get_comments_count(db, post_id=post_id, keyword=keyword)
+
+    # 获取每条评论对应的文章标题
+    result = []
+    for comment in comments:
+        post = await get_post_by_id(db, comment.post_id)
+        result.append(
+            {
+                "id": comment.id,
+                "post_id": comment.post_id,
+                "post_title": post.title if post else "Unknown",
+                "nickname": comment.nickname,
+                "content": comment.content,
+                "parent_id": comment.parent_id,
+                "created_at": comment.created_at,
+                "updated_at": comment.updated_at,
+            }
+        )
+
+    return {"comments": result, "total": total, "skip": skip, "limit": limit}
+
+
+# ========== 设置路由 ==========
+
+
+@app.get("/api/admin/settings", response_model=SettingsResponse)
+async def get_settings(request: Request, db: AsyncSession = Depends(get_db)):
+    """
+    获取所有设置
+
+    Returns:
+        SettingsResponse: 设置列表
+
+    Requires Admin Authentication
+    """
+    await get_current_admin(request)
+
+    settings = await get_all_settings(db)
+    return {
+        "settings": [
+            SettingItem(key=s.key, value=s.value, description=s.description)
+            for s in settings
+        ]
+    }
+
+
+@app.post("/api/admin/settings")
+async def update_setting(
+    request: Request,
+    setting_data: SettingUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    创建或更新设置
+
+    Request Body:
+        key: 设置键
+        value: 设置值
+        description: 设置描述（可选）
+
+    Returns:
+        SettingItem: 更新后的设置
+
+    Requires Admin Authentication
+    """
+    await get_current_admin(request)
+
+    setting = await set_setting(
+        db,
+        key=setting_data.key,
+        value=setting_data.value,
+        description=setting_data.description,
+    )
+    return SettingItem(
+        key=setting.key, value=setting.value, description=setting.description
     )
 
 

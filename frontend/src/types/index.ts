@@ -142,3 +142,48 @@ export interface AdminLoginResponse {
   message: string
   token: string | null
 }
+
+// ========== 管理后台相关类型 ==========
+
+/**
+ * 仪表盘统计数据类型
+ */
+export interface DashboardStats {
+  total_posts: number
+  total_comments: number
+  total_views: number
+  scheduled_posts: number
+  monthly_posts: MonthlyPostStats[]
+}
+
+/**
+ * 月度文章统计类型
+ */
+export interface MonthlyPostStats {
+  month: string
+  count: number
+}
+
+/**
+ * 管理后台评论类型（含文章标题）
+ */
+export interface AdminComment {
+  id: number
+  post_id: number
+  post_title: string
+  nickname: string
+  content: string
+  parent_id: number | null
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * 管理后台评论列表响应类型
+ */
+export interface AdminCommentsResponse {
+  comments: AdminComment[]
+  total: number
+  skip: number
+  limit: number
+}

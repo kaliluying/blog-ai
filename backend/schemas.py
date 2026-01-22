@@ -173,3 +173,28 @@ class ArchiveYear(BaseModel):
     months: List[ArchiveGroup] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ========== 设置相关模式 ==========
+
+
+class SettingItem(BaseModel):
+    """设置项模式"""
+
+    key: str
+    value: str
+    description: Optional[str] = None
+
+
+class SettingUpdate(BaseModel):
+    """更新设置请求模式"""
+
+    key: str
+    value: str
+    description: Optional[str] = None
+
+
+class SettingsResponse(BaseModel):
+    """设置列表响应模式"""
+
+    settings: List[SettingItem]
