@@ -189,9 +189,9 @@ class SettingItem(BaseModel):
 class SettingUpdate(BaseModel):
     """更新设置请求模式"""
 
-    key: str
-    value: str
-    description: Optional[str] = None
+    key: str = Field(..., min_length=1, max_length=100)
+    value: str = Field(..., max_length=1000)
+    description: Optional[str] = Field(None, max_length=255)
 
 
 class SettingsResponse(BaseModel):

@@ -22,40 +22,39 @@ password_hash = PasswordHash.recommended()
 # JWT 配置
 SECRET_KEY: str = os.getenv("JWT_SECRET", "")
 if not SECRET_KEY:
-    # 使用安全的默认密钥（仅开发环境使用）
-    import secrets
-
-    SECRET_KEY = secrets.token_hex(32)
-    import warnings
-
-    warnings.warn(
-        "JWT_SECRET not set, using auto-generated secret key. "
-        "Set JWT_SECRET in .env for production use.",
-        UserWarning,
+    raise ValueError(
+        "JWT_SECRET environment variable is required. "
+        "Generate one with: openssl rand -hex 32"
     )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(
     os.getenv("JWT_EXPIRE_MINUTES", "1440")
 )  # 默认 24 小时
 
-# 管理员密码
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
-ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH")  # 可选的预哈希密码
+# 管理员密码（仅支持哈希）
+ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH")
+if not ADMIN_PASSWORD_HASH:
+    raise ValueError(
+        "ADMIN_PASSWORD_HASH environment variable is required. "
+        "Generate with: python -c \"from pwdlib import PasswordHash; print(PasswordHash.recommended().hash('your_password'))\""
+    )
 
 
 def verify_admin_password(password: str) -> bool:
     """验证管理员密码
-
-    支持两种验证方式：
-    1. 如果设置了 ADMIN_PASSWORD_HASH，使用 Argon2 哈希验证
-    2. 否则使用明文比较（向后兼容）
+    
+    使用 Argon2 算法验证哈希密码，不支持明文密码。
+    
+    生成哈希密码：
+        python -c "from pwdlib import PasswordHash; print(PasswordHash.recommended().hash('your_password'))"
+    
+    Args:
+        password: 用户输入的明文密码
+        
+    Returns:
+        bool: 密码正确返回 True，否则返回 False
     """
-    if ADMIN_PASSWORD_HASH:
-        # 使用 Argon2 哈希验证
-        return password_hash.verify(password, ADMIN_PASSWORD_HASH)
-    else:
-        # 明文比较（向后兼容）
-        return password == ADMIN_PASSWORD
+    return password_hash.verify(password, ADMIN_PASSWORD_HASH)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:

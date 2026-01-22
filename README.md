@@ -32,7 +32,15 @@ cd backend
 uv sync
 
 # 配置环境变量
-cp .env.example .env  # 编辑 DATABASE_URL 和 ADMIN_PASSWORD
+cp ../.env.example .env
+
+# 生成管理员哈希密码
+python -c "from pwdlib import PasswordHash; print(PasswordHash.recommended().hash('your_password'))"
+# 将输出复制到 .env 的 ADMIN_PASSWORD_HASH
+
+# 生成 JWT Secret
+openssl rand -hex 32
+# 将输出复制到 .env 的 JWT_SECRET
 
 # 运行数据库迁移
 uv run alembic upgrade head
@@ -97,10 +105,20 @@ uv run alembic upgrade head
 ## Docker 部署
 
 ```bash
-# 构建并启动所有服务
+# 1. 创建环境变量文件
+cat > .env << EOF
+# 生成哈希密码
+ADMIN_PASSWORD_HASH=$(python -c "from pwdlib import PasswordHash; print(PasswordHash.recommended().hash('your_password'))")
+# 生成 JWT Secret
+JWT_SECRET=$(openssl rand -hex 32)
+# 生成数据库密码
+DB_PASSWORD=$(openssl rand -base64 24)
+EOF
+
+# 2. 构建并启动所有服务
 docker-compose up -d
 
-# 查看日志
+# 3. 查看日志
 docker-compose logs -f
 
 # 重新构建镜像
@@ -115,8 +133,17 @@ docker-compose up -d --build
 
 ```env
 DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/blog
-ADMIN_PASSWORD=admin123
+JWT_SECRET=your_jwt_secret_here  # ⚠️ 必须设置随机密钥
+ADMIN_PASSWORD_HASH=$argon2id$v=19$...  # ⚠️ 必须设置哈希密码
 ```
+
+**安全提示**：
+- `DATABASE_URL`: 数据库连接字符串，必须设置
+- `JWT_SECRET`: 使用 `openssl rand -hex 32` 生成随机密钥
+- `ADMIN_PASSWORD_HASH`: 管理员哈希密码（不支持明文），生成方法：
+  ```bash
+  python -c "from pwdlib import PasswordHash; print(PasswordHash.recommended().hash('your_password'))"
+  ```
 
 ## 技术栈
 

@@ -82,8 +82,9 @@ export const useAdminStore = defineStore('admin', () => {
         error.value = response.message || '登录失败'
         return false
       }
-    } catch (e: any) {
-      error.value = e.response?.data?.message || '登录失败，请稍后重试'
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } }
+      error.value = err.response?.data?.message || '登录失败，请稍后重试'
       return false
     } finally {
       loading.value = false

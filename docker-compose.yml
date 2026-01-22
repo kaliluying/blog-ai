@@ -7,8 +7,9 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://blog:blog_password@db:5432/blog
-      - ADMIN_PASSWORD=176294955ll
+      - DATABASE_URL=postgresql+asyncpg://blog:${DB_PASSWORD}@db:5432/blog
+      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH}  # ⚠️ 必须设置哈希密码（不支持明文）
+      - JWT_SECRET=${JWT_SECRET}  # ⚠️ 必须设置随机密钥
       - CORS_ORIGINS=http://localhost,http://127.0.0.1
     depends_on:
       db:
@@ -31,7 +32,7 @@ services:
     container_name: blog-ai-db
     environment:
       - POSTGRES_USER=blog
-      - POSTGRES_PASSWORD=blog_password
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-CHANGE_DB_PASSWORD}  # ⚠️ 必须修改
       - POSTGRES_DB=blog
     volumes:
       - postgres_data:/var/lib/postgresql/data

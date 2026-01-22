@@ -28,10 +28,12 @@ load_dotenv()
 # ========== 数据库配置 ==========
 
 # 数据库连接 URL
-# 优先级：环境变量 DATABASE_URL > 默认值
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql+asyncpg://postgres:CHANGE_THIS_PASSWORD@localhost:5432/blog_ai"
-)
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError(
+        "DATABASE_URL environment variable is required. "
+        "Example: postgresql+asyncpg://user:password@localhost:5432/blog_ai"
+    )
 
 # 创建异步数据库引擎
 # echo: 从环境变量读取，默认关闭 SQL 日志（生产环境）
@@ -65,11 +67,12 @@ async def get_db():
     使用 FastAPI 的 Depends 机制提供数据库会话：
     1. 创建一个新的异步会话
     2. 尝试执行业务逻辑
-    3. 无论成功或失败，确保会话正确关闭
+    3. 异常时自动回滚，确保事务一致性
+    4. 无论成功或失败，确保会话正确关闭
 
     注意：
     - CRUD 函数中需要显式调用 await db.commit() 来提交事务
-    - 异常时需要调用 await db.rollback() 来回滚事务
+    - 异常会自动触发 rollback
 
     Yields:
         AsyncSession: 数据库会话实例
@@ -83,6 +86,9 @@ async def get_db():
     async with async_session() as session:
         try:
             yield session
+        except Exception:
+            await session.rollback()
+            raise
         finally:
             await session.close()
 

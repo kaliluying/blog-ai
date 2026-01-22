@@ -15,11 +15,13 @@ Blog AI 后端 API 主入口文件
 
 # 标准库导入
 import json
+import logging
 import os
 import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime
+from ipaddress import ip_address, ip_network, AddressValueError
 from typing import Any, List
 
 # 第三方库导入
@@ -116,6 +118,10 @@ COMMENT_RATE_LIMIT = 5  # 最多评论次数
 COMMENT_RATE_WINDOW = 60  # 时间窗口（秒）
 
 # 记录每个 IP 的评论时间戳
+# 注意：此实现存在以下限制：
+# 1. 数据存储在内存中，服务器重启后会丢失
+# 2. 多实例部署时无法共享状态
+# 3. 生产环境建议使用 Redis 或其他持久化存储方案
 comment_rate_tracker: dict[str, list[float]] = {}
 
 # 可信代理 IP 列表（从环境变量读取，多个用逗号分隔）
@@ -144,23 +150,31 @@ def get_client_ip(request: Request) -> str:
 
     # 检查 X-Forwarded-For 头
     forwarded = request.headers.get("X-Forwarded-For", "")
-    if forwarded:
+    if forwarded and direct_ip:
         # 提取第一个 IP（原始客户端 IP）
         client_ip = forwarded.split(",")[0].strip()
 
         # 验证直接连接 IP 是否在可信代理列表中
-        if direct_ip and any(
-            direct_ip == proxy
-            or (
-                proxy.endswith("/") and direct_ip.startswith(proxy.rstrip("/"))
-            )  # CIDR 格式
-            for proxy in TRUSTED_PROXIES
-        ):
-            # 信任 X-Forwarded-For，返回原始客户端 IP
-            return client_ip
-        else:
-            # 来自不可信来源，忽略 X-Forwarded-For，使用直接连接 IP
-            return direct_ip or client_ip
+        try:
+            direct_ip_obj = ip_address(direct_ip)
+            for proxy in TRUSTED_PROXIES:
+                try:
+                    # 检查是否是 CIDR 格式
+                    if "/" in proxy:
+                        if direct_ip_obj in ip_network(proxy, strict=False):
+                            return client_ip
+                    # 精确匹配
+                    elif direct_ip == proxy.strip():
+                        return client_ip
+                except (AddressValueError, ValueError):
+                    # 忽略无效的代理配置
+                    continue
+        except AddressValueError:
+            # 无效的 direct_ip，使用它作为后备
+            pass
+
+        # 来自不可信来源，忽略 X-Forwarded-For，使用直接连接 IP
+        return direct_ip or client_ip
 
     return direct_ip or "0.0.0.0"
 
@@ -258,8 +272,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
 )
 
 
@@ -274,7 +288,7 @@ async def admin_login(request_body: AdminLoginRequest):
     验证密码后返回 JWT token。
 
     Request Body:
-        password: 管理员密码（从环境变量 ADMIN_PASSWORD 读取）
+        password: 管理员密码（明文），与环境变量 ADMIN_PASSWORD_HASH 中的哈希值比对
 
     Returns:
         AdminLoginResponse: 登录结果及 token
@@ -710,10 +724,12 @@ async def get_related_posts_route(
     except HTTPException:
         raise
     except Exception as e:
-        import traceback
-
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        # 记录详细错误到日志，但不暴露给客户端
+        logging.error(f"Error fetching related posts for post_id={post_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, 
+            detail="获取相关文章失败，请稍后重试"
+        )
 
 
 @app.post("/api/posts/{post_id}/view")
@@ -1038,15 +1054,21 @@ async def get_admin_comments(
     )
     total = await get_comments_count(db, post_id=post_id, keyword=keyword)
 
-    # 获取每条评论对应的文章标题
+    # 优化：一次性查询所有需要的文章，避免 N+1 查询问题
+    post_ids = list(set(comment.post_id for comment in comments))
+    posts_result = await db.execute(
+        select(BlogPost.id, BlogPost.title).where(BlogPost.id.in_(post_ids))
+    )
+    posts_map = {post_id: title for post_id, title in posts_result.all()}
+
+    # 构建结果
     result = []
     for comment in comments:
-        post = await get_post_by_id(db, comment.post_id)
         result.append(
             {
                 "id": comment.id,
                 "post_id": comment.post_id,
-                "post_title": post.title if post else "Unknown",
+                "post_title": posts_map.get(comment.post_id, "Unknown"),
                 "nickname": comment.nickname,
                 "content": comment.content,
                 "parent_id": comment.parent_id,
@@ -1059,6 +1081,16 @@ async def get_admin_comments(
 
 
 # ========== 设置路由 ==========
+
+# 允许的设置键白名单
+ALLOWED_SETTINGS_KEYS = {
+    "site_title",
+    "site_description",
+    "site_keywords",
+    "comment_enabled",
+    "posts_per_page",
+    "analytics_id",
+}
 
 
 @app.get("/api/admin/settings", response_model=SettingsResponse)
@@ -1092,7 +1124,7 @@ async def update_setting(
     创建或更新设置
 
     Request Body:
-        key: 设置键
+        key: 设置键（仅允许白名单内的键）
         value: 设置值
         description: 设置描述（可选）
 
@@ -1102,6 +1134,13 @@ async def update_setting(
     Requires Admin Authentication
     """
     await get_current_admin(request)
+
+    # 验证设置键是否在白名单中
+    if setting_data.key not in ALLOWED_SETTINGS_KEYS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"不允许的设置键。允许的键: {', '.join(sorted(ALLOWED_SETTINGS_KEYS))}"
+        )
 
     setting = await set_setting(
         db,
