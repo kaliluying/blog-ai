@@ -88,29 +88,29 @@ const drawBorder = () => {
   // 创建 Rough.js 生成器
   const generator = rough.svg(svg)
 
-  // 边框配置选项
+  // 边框配置选项 - 使用更小的 roughness 和 bowing 减少偏移
   const options: rough.Options = {
-    roughness: props.roughness ?? 2,   // 粗糙度
-    bowing: props.bowing ?? 1,         // 弯曲度
+    roughness: 1,         // 降低粗糙度
+    bowing: 0.5,          // 降低弯曲度
     stroke: props.stroke ?? '#2c3e50', // 描边颜色
     strokeWidth: props.strokeWidth ?? 2, // 描边宽度
     fill: undefined,                   // 无填充
   }
 
-  // 绘制矩形（留出 2px 内边距）
+  // 绘制矩形（留出 4px 内边距）
   const node = generator.rectangle(
-    2,                    // x 坐标
-    2,                    // y 坐标
-    rect.width - 4,       // 宽度（减去内边距）
-    rect.height - 4,      // 高度（减去内边距）
+    4,                    // x 坐标
+    4,                    // y 坐标
+    rect.width - 8,       // 宽度（减去内边距）
+    rect.height - 8,      // 高度（减去内边距）
     options
   )
 
   // 将矩形节点添加到 SVG
   svg.appendChild(node)
 
-  // 将 SVG 插入到插槽内容之前（使其在底层）
-  element.insertBefore(svg, slotContent)
+  // 将 SVG 插入到元素最后（位于底层）
+  element.appendChild(svg)
 }
 
 // ========== 生命周期 ==========
@@ -159,5 +159,6 @@ watch(
 .hand-drawn-border {
   position: relative;
   background: var(--card-bg);
+  overflow: hidden;
 }
 </style>

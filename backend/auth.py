@@ -14,7 +14,8 @@ from pwdlib import PasswordHash
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+# 加载 .env 环境变量（使用绝对路径确保从任何目录运行都能正确加载）
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
 # 密码哈希器（使用推荐的 Argon2 算法）
 password_hash = PasswordHash.recommended()

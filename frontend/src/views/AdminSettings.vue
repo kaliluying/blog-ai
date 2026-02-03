@@ -95,11 +95,16 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
 import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
 import { settingsApi } from '@/api'
+import { useAdminStore } from '@/stores/auth'
 
+const router = useRouter()
+const route = useRoute()
+const adminStore = useAdminStore()
 const message = useMessage()
 const saving = ref(false)
 
@@ -154,7 +159,16 @@ const saveCommentRateLimit = async () => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  if (!adminStore.initialized) {
+    await adminStore.init()
+  }
+
+  if (!adminStore.isLoggedIn) {
+    router.replace({ name: 'AdminLogin', query: { redirect: route.fullPath } })
+    return
+  }
+
   loadSettings()
 })
 </script>

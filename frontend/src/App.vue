@@ -69,6 +69,18 @@
                 <p>手绘风格博客 - Built with Vue 3 + Naive UI + Rough.js</p>
               </footer>
 
+              <!-- 回到顶部按钮 -->
+              <transition name="slide-up">
+                <n-button v-if="showBackToTop" circle class="back-to-top" @click="scrollToTop">
+                  <template #icon>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 19V5M5 12l7-7 7 7" />
+                    </svg>
+                  </template>
+                </n-button>
+              </transition>
+
             </div>
           </n-loading-bar-provider>
         </n-dialog-provider>
@@ -78,7 +90,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, h } from 'vue'
+import { ref, computed, h, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { NIcon, type GlobalThemeOverrides, darkTheme } from 'naive-ui'
 
@@ -92,6 +104,25 @@ const authStore = useAuthStore()
 const themeStore = useThemeStore()
 
 const searchQuery = ref('')
+const showBackToTop = ref(false)
+
+// 监听滚动事件
+const handleScroll = () => {
+  showBackToTop.value = window.scrollY > 300
+}
+
+// 回到顶部
+const scrollToTop = () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+onMounted(() => {
+  window.addEventListener('scroll', handleScroll)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
+})
 
 const themeIcon = computed(() => {
   return themeStore.isDark ? MoonIcon : SunIcon
@@ -214,8 +245,9 @@ body {
 .header {
   background: var(--card-bg);
   border-bottom: 2px solid var(--border-color);
-  position: relative;
-  z-index: 10;
+  position: sticky;
+  top: 0;
+  z-index: 100;
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 
@@ -324,5 +356,24 @@ html.dark .article-content :deep(pre .copy-btn) {
 html.dark .article-content :deep(pre .copy-btn:hover) {
   background: rgba(255, 255, 255, 0.2);
   color: #e4e4e7;
+}
+
+.back-to-top {
+  position: fixed;
+  bottom: 40px;
+  right: 40px;
+  z-index: 100;
+  box-shadow: 2px 2px 0 var(--border-color);
+}
+
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  opacity: 0;
+  transform: translateY(20px);
 }
 </style>

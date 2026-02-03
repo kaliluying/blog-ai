@@ -136,7 +136,7 @@ import { useDebounceFn } from '@vueuse/core'
 import { useRouter, useRoute } from 'vue-router'
 
 // 从 naive-ui 导入消息提示和对话框
-import { useMessage, useDialog } from 'naive-ui'
+import { useMessage } from 'naive-ui'
 
 // 导入自定义手绘风格组件
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
@@ -170,41 +170,13 @@ const route = useRoute()
 // 消息提示实例
 const message = useMessage()
 
-// 对话框实例
-const dialog = useDialog()
-
 // 认证状态
 const authStore = useAuthStore()
 
 // ========== 辅助函数 ==========
 
-// 显示登录对话框
-const showLoginDialog = () => {
-  const passwordRef = ref('')
-
-  dialog.create({
-    title: '博主登录',
-    content: '请输入管理员密码以继续',
-    positiveText: '登录',
-    negativeText: '返回',
-    maskClosable: false,
-    onPositiveClick: async () => {
-      if (!passwordRef.value) {
-        message.warning('请输入密码')
-        return false
-      }
-      const success = await authStore.login(passwordRef.value)
-      if (success) {
-        message.success('登录成功')
-        fetchPost()
-      } else {
-        message.error(authStore.error || '密码错误')
-      }
-    },
-    onNegativeClick: () => {
-      router.back()
-    }
-  })
+const redirectToLogin = () => {
+  router.replace({ name: 'AdminLogin', query: { redirect: route.fullPath } })
 }
 
 // ========== 响应式状态 ==========
@@ -350,7 +322,7 @@ const checkTitleDuplicate = async () => {
     if (axiosError.response?.status === 401) {
       localStorage.removeItem('adminToken')
       authStore.token = null
-      showLoginDialog()
+      redirectToLogin()
     }
     titleValidation.value = {
       checking: false,
@@ -449,7 +421,7 @@ onMounted(async () => {
 
   // 未登录时显示登录对话框
   if (!authStore.isLoggedIn) {
-    showLoginDialog()
+    redirectToLogin()
   } else {
     fetchPost()
   }

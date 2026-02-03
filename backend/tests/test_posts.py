@@ -5,27 +5,22 @@
 """
 
 import pytest
-import json
+
+
+async def get_admin_token(client) -> str:
+    response = await client.post("/api/admin/login", json={"password": "admin123"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["token"]
+    return data["token"]
 
 
 @pytest.mark.asyncio
 async def test_create_post(client):
     """测试创建文章（需要管理员权限）"""
-    # 先注册管理员用户
-    await client.post(
-        "/api/auth/register",
-        json={
-            "username": "admin",
-            "email": "admin@example.com",
-            "password": "admin123",
-        },
-    )
-
-    # 登录获取 token
-    login_response = await client.post(
-        "/api/auth/login", data={"username": "admin", "password": "admin123"}
-    )
-    token = login_response.json()["access_token"]
+    # 管理员登录获取 token
+    token = await get_admin_token(client)
 
     # 创建文章
     response = await client.post(
@@ -63,20 +58,7 @@ async def test_create_post_without_auth(client):
 @pytest.mark.asyncio
 async def test_list_posts(client):
     """测试获取文章列表"""
-    # 先创建一篇文章
-    await client.post(
-        "/api/auth/register",
-        json={
-            "username": "admin",
-            "email": "admin@example.com",
-            "password": "admin123",
-        },
-    )
-
-    login_response = await client.post(
-        "/api/auth/login", data={"username": "admin", "password": "admin123"}
-    )
-    token = login_response.json()["access_token"]
+    token = await get_admin_token(client)
 
     await client.post(
         "/api/posts",
@@ -99,20 +81,7 @@ async def test_list_posts(client):
 @pytest.mark.asyncio
 async def test_get_single_post(client):
     """测试获取单篇文章"""
-    # 创建文章
-    await client.post(
-        "/api/auth/register",
-        json={
-            "username": "admin",
-            "email": "admin@example.com",
-            "password": "admin123",
-        },
-    )
-
-    login_response = await client.post(
-        "/api/auth/login", data={"username": "admin", "password": "admin123"}
-    )
-    token = login_response.json()["access_token"]
+    token = await get_admin_token(client)
 
     create_response = await client.post(
         "/api/posts",
@@ -142,20 +111,7 @@ async def test_get_nonexistent_post(client):
 @pytest.mark.asyncio
 async def test_update_post(client):
     """测试更新文章"""
-    # 创建文章
-    await client.post(
-        "/api/auth/register",
-        json={
-            "username": "admin",
-            "email": "admin@example.com",
-            "password": "admin123",
-        },
-    )
-
-    login_response = await client.post(
-        "/api/auth/login", data={"username": "admin", "password": "admin123"}
-    )
-    token = login_response.json()["access_token"]
+    token = await get_admin_token(client)
 
     create_response = await client.post(
         "/api/posts",
@@ -187,20 +143,7 @@ async def test_update_post(client):
 @pytest.mark.asyncio
 async def test_delete_post(client):
     """测试删除文章"""
-    # 创建文章
-    await client.post(
-        "/api/auth/register",
-        json={
-            "username": "admin",
-            "email": "admin@example.com",
-            "password": "admin123",
-        },
-    )
-
-    login_response = await client.post(
-        "/api/auth/login", data={"username": "admin", "password": "admin123"}
-    )
-    token = login_response.json()["access_token"]
+    token = await get_admin_token(client)
 
     create_response = await client.post(
         "/api/posts",
@@ -228,20 +171,7 @@ async def test_delete_post(client):
 @pytest.mark.asyncio
 async def test_search_posts(client):
     """测试搜索文章"""
-    # 创建文章
-    await client.post(
-        "/api/auth/register",
-        json={
-            "username": "admin",
-            "email": "admin@example.com",
-            "password": "admin123",
-        },
-    )
-
-    login_response = await client.post(
-        "/api/auth/login", data={"username": "admin", "password": "admin123"}
-    )
-    token = login_response.json()["access_token"]
+    token = await get_admin_token(client)
 
     await client.post(
         "/api/posts",

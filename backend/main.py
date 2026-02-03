@@ -17,10 +17,10 @@ Blog AI 后端 API 主入口文件
 import json
 import logging
 import os
-import time
+from time import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from ipaddress import ip_address, ip_network, AddressValueError
 from typing import Any, List
 
@@ -34,8 +34,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import dotenv
 
-# 加载 .env 环境变量
-dotenv.load_dotenv()
+# 加载 .env 环境变量（使用绝对路径确保从任何目录运行都能正确加载）
+dotenv.load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
 # 内部模块导入
 from database import get_db
@@ -113,9 +113,9 @@ class AdminLoginResponse(BaseModel):
 
 # ========== 评论频率限制 ==========
 
-# 评论频率限制配置
-COMMENT_RATE_LIMIT = 5  # 最多评论次数
-COMMENT_RATE_WINDOW = 60  # 时间窗口（秒）
+# 评论频率限制配置（默认值）
+DEFAULT_COMMENT_RATE_LIMIT = 5  # 最多评论次数
+DEFAULT_COMMENT_RATE_WINDOW = 60  # 时间窗口（秒）
 
 # 记录每个 IP 的评论时间戳
 # 注意：此实现存在以下限制：
@@ -179,7 +179,30 @@ def get_client_ip(request: Request) -> str:
     return direct_ip or "0.0.0.0"
 
 
-def check_comment_rate_limit(client_ip: str) -> bool:
+async def get_comment_rate_config(db: AsyncSession) -> tuple[int, int]:
+    """
+    获取评论频率限制配置
+
+    优先从设置表读取，读取失败或值非法时回退到默认值。
+    """
+    limit_value = await get_setting(db, "comment_rate_limit")
+    window_value = await get_setting(db, "comment_rate_window")
+
+    def parse_positive_int(value: str | None, default: int) -> int:
+        if value is None:
+            return default
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return default
+        return parsed if parsed > 0 else default
+
+    rate_limit = parse_positive_int(limit_value, DEFAULT_COMMENT_RATE_LIMIT)
+    rate_window = parse_positive_int(window_value, DEFAULT_COMMENT_RATE_WINDOW)
+    return rate_limit, rate_window
+
+
+def check_comment_rate_limit(client_ip: str, rate_limit: int, rate_window: int) -> bool:
     """
     检查评论频率限制
 
@@ -197,10 +220,10 @@ def check_comment_rate_limit(client_ip: str) -> bool:
 
     # 清理过期的时间戳（保留窗口内的）
     comment_rate_tracker[client_ip] = [
-        t for t in comment_rate_tracker[client_ip] if now - t < COMMENT_RATE_WINDOW
+        t for t in comment_rate_tracker[client_ip] if now - t < rate_window
     ]
     # 检查是否超出限制
-    if len(comment_rate_tracker[client_ip]) >= COMMENT_RATE_LIMIT:
+    if len(comment_rate_tracker[client_ip]) >= rate_limit:
         return False
     # 记录本次请求
     comment_rate_tracker[client_ip].append(now)
@@ -215,6 +238,16 @@ async def lifespan(app: FastAPI):
     数据库迁移由 Alembic 管理（migrations/ 目录）
     初始化默认设置
     """
+    # 启动时创建数据库表
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    from database import engine
+    from models import Base
+
+    # 数据库表创建已禁用，改由 Alembic 迁移管理
+
     yield
 
 
@@ -273,7 +306,13 @@ app.add_middleware(
     allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Origin",
+        "X-Requested-With",
+    ],
 )
 
 
@@ -350,6 +389,10 @@ def parse_post_tags(post: BlogPost) -> List[str]:
 def post_to_dict(post: BlogPost) -> dict:
     """将 BlogPost ORM 模型转换为完整字典"""
     now = utc_now()
+    post_date = post.date
+    # 确保两边时区一致
+    if post_date.tzinfo is None:
+        post_date = post_date.replace(tzinfo=timezone.utc)
     return {
         "id": post.id,
         "title": post.title,
@@ -360,7 +403,7 @@ def post_to_dict(post: BlogPost) -> dict:
         "updated_at": post.updated_at,
         "tags": parse_post_tags(post),
         "view_count": post.view_count,
-        "is_scheduled": post.date > now,  # 是否定时发布（未来时间）
+        "is_scheduled": post_date > now,  # 是否定时发布（未来时间）
     }
 
 
@@ -389,23 +432,19 @@ def comment_to_dict(comment: Comment, nickname: str | None = None) -> dict:
     }
 
 
-from typing import Any, TypedDict
-
-
-from typing import Any, List, cast
-
-
 def group_posts_by_month(posts: List[BlogPost], year: int) -> List[ArchiveGroup]:
     """将文章列表按月份分组"""
     months_data: dict[int, list[BlogPostListItem]] = {}
 
     for post in posts:
-        post_date = post.date if hasattr(post.date, "month") else post.date.month
-        month = (
-            post_date.month
-            if hasattr(post_date, "month")
-            else int(post_date.split("-")[1])
-        )
+        post_date = post.date
+        if isinstance(post_date, datetime):
+            month = post_date.month
+        else:
+            try:
+                month = datetime.fromisoformat(str(post_date)).month
+            except ValueError:
+                continue
 
         if month not in months_data:
             months_data[month] = []
@@ -539,7 +578,8 @@ async def create_comment_route(
     client_ip = get_client_ip(request)
 
     # 检查频率限制
-    if not check_comment_rate_limit(client_ip):
+    rate_limit, rate_window = await get_comment_rate_config(db)
+    if not check_comment_rate_limit(client_ip, rate_limit, rate_window):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="评论过于频繁，请稍后再试",
@@ -725,11 +765,10 @@ async def get_related_posts_route(
         raise
     except Exception as e:
         # 记录详细错误到日志，但不暴露给客户端
-        logging.error(f"Error fetching related posts for post_id={post_id}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500, 
-            detail="获取相关文章失败，请稍后重试"
+        logging.error(
+            f"Error fetching related posts for post_id={post_id}: {e}", exc_info=True
         )
+        raise HTTPException(status_code=500, detail="获取相关文章失败，请稍后重试")
 
 
 @app.post("/api/posts/{post_id}/view")
@@ -1084,6 +1123,9 @@ async def get_admin_comments(
 
 # 允许的设置键白名单
 ALLOWED_SETTINGS_KEYS = {
+    "comment_rate_limit",
+    "comment_rate_window",
+    "jwt_expire_minutes",
     "site_title",
     "site_description",
     "site_keywords",
@@ -1139,7 +1181,7 @@ async def update_setting(
     if setting_data.key not in ALLOWED_SETTINGS_KEYS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"不允许的设置键。允许的键: {', '.join(sorted(ALLOWED_SETTINGS_KEYS))}"
+            detail=f"不允许的设置键。允许的键: {', '.join(sorted(ALLOWED_SETTINGS_KEYS))}",
         )
 
     setting = await set_setting(

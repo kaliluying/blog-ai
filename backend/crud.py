@@ -21,7 +21,6 @@ from typing import List, Optional
 # 第三方库导入
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, text, func, distinct
-from sqlalchemy.dialects.postgresql import JSONB
 
 # 内部模块导入
 from models import BlogPost, Comment, SiteSettings
@@ -443,17 +442,15 @@ async def increment_post_view(db: AsyncSession, post_id: int) -> bool:
     """
     from sqlalchemy import update
 
-    # 使用 update().returning() 获取更新后的行数
+    # MySQL 不支持 RETURNING，使用 rowcount 判断
     stmt = (
         update(BlogPost)
         .where(BlogPost.id == post_id)
         .values(view_count=BlogPost.view_count + 1)
-        .returning(BlogPost.id)
     )
     result = await db.execute(stmt)
     await db.commit()
-    updated_row = result.fetchone()
-    return updated_row is not None
+    return result.rowcount > 0
 
 
 async def check_view_record_exists(db: AsyncSession, post_id: int, ip: str) -> bool:
@@ -499,18 +496,16 @@ async def record_post_view(db: AsyncSession, post_id: int, ip: str) -> bool:
     if await check_view_record_exists(db, post_id, ip):
         return False
 
-    # 记录新浏览（使用 ON CONFLICT DO NOTHING 处理并发）
+    # 记录新浏览（MySQL 使用 INSERT IGNORE）
     result = await db.execute(
         text("""
-            INSERT INTO post_view_ips (post_id, ip, viewed_at)
+            INSERT IGNORE INTO post_view_ips (post_id, ip, viewed_at)
             VALUES (:post_id, :ip, :viewed_at)
-            ON CONFLICT (post_id, ip) DO NOTHING
         """),
         {"post_id": post_id, "ip": ip, "viewed_at": now},
     )
 
     # 只有插入新记录时才增加阅读量
-    # 异步 SQLAlchemy 可能没有 rowcount，使用 safe check
     row_count = getattr(result, "rowcount", 0) or 0
     if row_count > 0:
         await increment_post_view(db, post_id)
@@ -571,12 +566,13 @@ async def get_related_posts(
 
     now = utc_now()
 
-    # 使用 ORM 表达式构建标签匹配条件
-    # BlogPost.tags 是 JSON 类型，需要 cast 到 JSONB 才能使用 jsonb_exists
+    # MySQL 使用 JSON_CONTAINS 检查 JSON 数组是否包含指定值
     from sqlalchemy import or_
 
+    # 构建标签匹配条件：JSON_CONTAINS(tags, '"tagname"')
     tag_conditions = [
-        func.jsonb_exists(BlogPost.tags.cast(JSONB), tag) for tag in tags[:5]
+        text("JSON_CONTAINS(blog_posts.tags, :tag)").params(tag=f'"{tag}"')
+        for tag in tags[:5]
     ]
 
     # 构建基础查询

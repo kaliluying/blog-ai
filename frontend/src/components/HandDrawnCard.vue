@@ -13,6 +13,7 @@
     :roughness="2"
     stroke="#34495e"
     class="hand-drawn-card"
+    :class="{ 'no-hover': !hoverEffect }"
   >
     <!-- 卡片内容区域 -->
     <div class="card-content">
@@ -41,9 +42,11 @@ import HandDrawnDivider from './HandDrawnDivider.vue'
 /**
  * 组件属性
  * @param title - 可选的卡片标题
+ * @param hoverEffect - 是否启用悬浮效果（默认 true）
  */
 defineProps<{
   title?: string
+  hoverEffect?: boolean
 }>()
 </script>
 
@@ -55,6 +58,10 @@ defineProps<{
 
 .hand-drawn-card:hover {
   transform: rotate(-0.5deg) scale(1.01);
+}
+
+.hand-drawn-card.no-hover:hover {
+  transform: none;
 }
 
 .card-content {

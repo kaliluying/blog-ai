@@ -112,28 +112,28 @@ defineOptions({
   stroke: var(--border-color, #2c3e50);
   stroke-width: 1.5;
   fill: none;
-  opacity: 0.4;
+  opacity: 0.5;
 }
 
 .hand-drawn-shape {
   stroke: var(--border-color, #2c3e50);
   stroke-width: 1.5;
   fill: var(--card-bg, #fafafa);
-  opacity: 0.4;
+  opacity: 0.6;
 }
 
 .hand-drawn-star {
   stroke: var(--border-color, #2c3e50);
   stroke-width: 1.5;
   fill: var(--card-bg, #fafafa);
-  opacity: 0.5;
+  opacity: 0.7;
 }
 
 .hand-drawn-dot {
   stroke: var(--border-color, #2c3e50);
   stroke-width: 1.5;
   fill: var(--card-bg, #fafafa);
-  opacity: 0.4;
+  opacity: 0.6;
 }
 
 /* 中等屏幕 */

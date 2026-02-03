@@ -32,9 +32,8 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # 复制应用代码
 COPY backend/ .
 
-# 创建数据库表
+# 创建数据库表（运行时由 main.py 处理）
 RUN chmod +x /app/entrypoint.sh || true
-RUN python -c "from database import engine; from models import Base; Base.metadata.create_all(bind=engine)" 2>/dev/null || true
 
 # 暴露端口
 EXPOSE 8000

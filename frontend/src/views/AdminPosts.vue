@@ -82,7 +82,7 @@
 import { ref, computed, onMounted, watch, h } from 'vue'
 
 // 从 vue-router 导入路由功能
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 
 // 从 naive-ui 导入组件和类型
 import { useMessage, NButton, NTag, NSpace, NInput } from 'naive-ui'
@@ -111,6 +111,7 @@ const adminStore = useAdminStore()
 
 // 路由实例
 const router = useRouter()
+const route = useRoute()
 
 // 消息提示实例
 const message = useMessage()
@@ -293,7 +294,16 @@ const handlePageSizeChange = (size: number) => {
 // ========== 生命周期 ==========
 
 // 组件挂载时获取文章列表（包括定时发布的）
-onMounted(() => {
+onMounted(async () => {
+  if (!adminStore.initialized) {
+    await adminStore.init()
+  }
+
+  if (!adminStore.isLoggedIn) {
+    router.replace({ name: 'AdminLogin', query: { redirect: route.fullPath } })
+    return
+  }
+
   blogStore.fetchAdminPosts()
 })
 

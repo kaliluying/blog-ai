@@ -53,11 +53,9 @@ class Comment(Base):
     nickname: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     parent_id: Mapped[int | None] = mapped_column(nullable=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
     def __repr__(self):
@@ -89,15 +87,13 @@ class BlogPost(Base):
     excerpt: Mapped[str] = mapped_column(Text, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     tags: Mapped[List[str]] = mapped_column(JSON, default=list)
-    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    date: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     view_count: Mapped[int] = mapped_column(
         Integer, default=0, nullable=False, index=True
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
     def __repr__(self):
@@ -129,7 +125,7 @@ class SiteSettings(Base):
         DateTime(timezone=True), default=utc_now
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
     def __repr__(self):

@@ -88,8 +88,8 @@ watch(() => props.postId, () => {
 }
 
 .related-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
 
@@ -105,21 +105,38 @@ watch(() => props.postId, () => {
 .related-item:hover {
   background: var(--card-bg);
   border-color: var(--border-color);
-  transform: translateX(4px);
+  transform: translateY(-2px);
 }
 
 .related-title {
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 6px;
-  font-size: 1rem;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .related-meta {
   display: flex;
   gap: 12px;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .related-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .related-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 html.dark .related-item {

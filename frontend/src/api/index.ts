@@ -34,7 +34,8 @@ import type {
  */
 const api = axios.create({
   // 环境变量 VITE_API_BASE_URL 可配置后端地址
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
+  // 生产环境留空，通过 Nginx 代理 /api 到后端
+  baseURL: import.meta.env.VITE_API_BASE_URL || '',
 
   // 请求超时时间（毫秒）
   timeout: 10000,

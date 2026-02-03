@@ -91,7 +91,7 @@ docker-compose up -d --build
 
 ### Backend
 - **Framework**: FastAPI with async SQLAlchemy 2.0
-- **Database**: PostgreSQL with asyncpg (async) and psycopg (sync migrations)
+- **Database**: MySQL 8.4 with aiomysql (async) and pymysql (sync migrations)
 - **ORM**: SQLAlchemy 2.0 with `Mapped[T]` annotations
 - **Validation**: Pydantic v2 with `model_config` and `model_validate()`
 
@@ -128,13 +128,20 @@ Views -> Pinia Store (blog.ts) -> blogApi (api/index.ts) -> FastAPI Backend
 
 ## Admin Authentication
 
-- Admin login at `/admin/login` with `ADMIN_PASSWORD` env var
-- Default password: `admin123`
-- Session-based token stored in backend memory and localStorage
+- Admin login at `/admin/login` with `ADMIN_PASSWORD_HASH` env var (argon2 hash, **not plaintext**)
+- Token stored in backend memory and localStorage
 
-**Database** (in `backend/.env`):
-```
-DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/blog
+## Environment Variables (backend/.env)
+
+```bash
+# Database connection
+DATABASE_URL=mysql+aiomysql://user:password@localhost:3306/blog
+
+# Generate with: openssl rand -hex 32
+JWT_SECRET=your_jwt_secret_here
+
+# Generate with: python -c "from pwdlib import PasswordHash; print(PasswordHash.recommended().hash('your_password'))"
+ADMIN_PASSWORD_HASH=$argon2id$v=19$...
 ```
 
 ## Frontend Routes

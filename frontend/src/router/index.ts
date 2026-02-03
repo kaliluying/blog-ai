@@ -139,7 +139,7 @@ router.beforeEach(async (to, from, next) => {
   }
 
   // 检查是否访问管理页面（排除登录页）
-  const isAdminRoute = to.path.startsWith('/admin/')
+  const isAdminRoute = to.path.startsWith('/admin')
   const isLoginPage = to.path === '/admin/login'
 
   if (isAdminRoute && !isLoginPage && !adminStore.isLoggedIn) {

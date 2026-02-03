@@ -1,3 +1,4 @@
+# 版本2：本地构建（开发环境使用，注释掉上面版本1的内容，取消注释下面版本2）
 services:
   backend:
     build:
@@ -6,10 +7,9 @@ services:
     container_name: blog-ai-backend
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://blog:${DB_PASSWORD}@db:5432/blog
-      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH}  # ⚠️ 必须设置哈希密码（不支持明文）
-      - JWT_SECRET=${JWT_SECRET}  # ⚠️ 必须设置随机密钥
       - CORS_ORIGINS=http://localhost,http://127.0.0.1
     depends_on:
       db:
@@ -28,19 +28,22 @@ services:
     restart: unless-stopped
 
   db:
-    image: postgres:16-alpine
+    image: mysql:8.4
     container_name: blog-ai-db
     environment:
-      - POSTGRES_USER=blog
-      - POSTGRES_PASSWORD=${DB_PASSWORD:-CHANGE_DB_PASSWORD}  # ⚠️ 必须修改
-      - POSTGRES_DB=blog
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD:-root_password_2024}
+      - MYSQL_DATABASE=blog
+      - MYSQL_USER=blog
+      - MYSQL_PASSWORD=${DB_PASSWORD:-blog_password_2024}
+      - TZ=Asia/Shanghai
+    command: --default-time-zone='+08:00'
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U blog -d blog"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password_2024"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
 volumes:
-  postgres_data:
+  mysql_data:

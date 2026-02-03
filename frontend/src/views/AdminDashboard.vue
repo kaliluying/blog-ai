@@ -92,16 +92,19 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { NButton } from 'naive-ui'
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
 import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
 import { adminApi } from '@/api'
 import type { DashboardStats } from '@/types'
+import { useAdminStore } from '@/stores/auth'
 
 // ========== 响应式状态 ==========
 
 const router = useRouter()
+const route = useRoute()
+const adminStore = useAdminStore()
 const stats = ref<DashboardStats>({
   total_posts: 0,
   total_comments: 0,
@@ -182,7 +185,16 @@ const formatMonth = (monthStr: string): string => {
 
 // ========== 生命周期 ==========
 
-onMounted(() => {
+onMounted(async () => {
+  if (!adminStore.initialized) {
+    await adminStore.init()
+  }
+
+  if (!adminStore.isLoggedIn) {
+    router.replace({ name: 'AdminLogin', query: { redirect: route.fullPath } })
+    return
+  }
+
   fetchStats()
 })
 </script>

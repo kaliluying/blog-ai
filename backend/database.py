@@ -20,7 +20,7 @@ from typing import List
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
-from sqlalchemy.dialects import postgresql
+from sqlalchemy.dialects import mysql
 
 # 加载环境变量
 load_dotenv()
@@ -32,7 +32,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError(
         "DATABASE_URL environment variable is required. "
-        "Example: postgresql+asyncpg://user:password@localhost:5432/blog_ai"
+        "Example: mysql+aiomysql://user:password@localhost:3306/blog"
     )
 
 # 创建异步数据库引擎
@@ -42,18 +42,19 @@ engine = create_async_engine(
     DATABASE_URL,
     echo=DB_ECHO,
     pool_size=int(os.getenv("DB_POOL_SIZE", "5")),
-    max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "10"))
+    max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "10")),
 )
 
 # 创建异步会话工厂
 # expire_on_commit=False: 提交后不立即过期对象，提高性能
 async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
+
 # DeclarativeBase: SQLAlchemy 2.0 推荐的 ORM 模型基类
-# 配置类型映射：Python list[str] 映射到 PostgreSQL JSON 类型
+# 配置类型映射：Python list[str] 映射到 MySQL JSON 类型
 class Base(DeclarativeBase):
     type_annotation_map = {
-        List[str]: postgresql.JSON,
+        List[str]: mysql.JSON,
     }
 
 
@@ -103,9 +104,4 @@ async def init_db():
     在应用启动时调用，创建所有定义的数据库表。
     使用 SQLAlchemy 2.0 的 run_sync 方法同步执行 DDL。
     """
-    # 导入模型，确保 metadata 包含所有表定义
-    from models import BlogPost, Comment
-
-    async with engine.begin() as conn:
-        # 创建所有继承自 Base 的模型对应的表
-        await conn.run_sync(Base.metadata.create_all)
+    raise RuntimeError("init_db 已禁用，请使用 Alembic 迁移管理数据库表")

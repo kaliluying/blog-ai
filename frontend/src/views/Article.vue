@@ -15,6 +15,9 @@
     <!-- 手绘风格背景 -->
     <HandDrawnBackground />
 
+    <!-- 页面两侧装饰 -->
+    <PageDecorations />
+
     <!-- 文章容器 -->
     <div class="article-container">
 
@@ -41,7 +44,7 @@
         <div class="article-layout">
           <!-- 左侧：文章主体 -->
           <div class="article-main">
-            <HandDrawnCard class="article-card">
+            <HandDrawnCard class="article-card" :hover-effect="false">
               <!-- 文章头部：标题和元信息 -->
               <div class="article-header">
                 <n-button quaternary @click="router.back()" class="back-btn">
@@ -108,6 +111,7 @@ import { useRoute, useRouter } from 'vue-router'
 // 导入自定义手绘风格组件
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
 import HandDrawnBackground from '@/components/HandDrawnBackground.vue'
+import PageDecorations from '@/components/PageDecorations.vue'
 
 // 导入 API 和工具函数
 import { blogApi, commentApi } from '@/api'

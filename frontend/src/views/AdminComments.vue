@@ -101,6 +101,7 @@ import { useMessage, NInput, NButton, NSpin, NPagination } from 'naive-ui'
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
 import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
 import { adminApi } from '@/api'
+import { useAdminStore } from '@/stores/auth'
 import type { AdminComment } from '@/types'
 import { formatDate } from '@/utils/date'
 
@@ -108,6 +109,7 @@ import { formatDate } from '@/utils/date'
 
 const router = useRouter()
 const message = useMessage()
+const adminStore = useAdminStore()
 
 const comments = ref<AdminComment[]>([])
 const loading = ref(true)
@@ -166,16 +168,24 @@ const handlePageSizeChange = (newSize: number) => {
 
 // ========== 生命周期 ==========
 
-onMounted(() => {
+onMounted(async () => {
+  if (!adminStore.initialized) {
+    await adminStore.init()
+  }
+
+  if (!adminStore.isLoggedIn) {
+    router.replace({ name: 'AdminLogin', query: { redirect: '/admin/comments' } })
+    return
+  }
+
   fetchComments()
 })
 
 // 搜索关键词变化时重新获取
+let searchTimeout: ReturnType<typeof setTimeout> | null = null
 watch(searchKeyword, () => {
-  // 防抖
-  let timeout: ReturnType<typeof setTimeout> | null = null
-  if (timeout) clearTimeout(timeout)
-  timeout = setTimeout(() => {
+  if (searchTimeout) clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
     handleSearch()
   }, 300)
 })

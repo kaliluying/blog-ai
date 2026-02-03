@@ -5,10 +5,19 @@
 """
 
 import asyncio
+import os
+
 import pytest
 from httpx import AsyncClient, ASGITransport
+from pwdlib import PasswordHash
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import StaticPool
+
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+os.environ.setdefault("JWT_SECRET", "test-secret")
+os.environ.setdefault(
+    "ADMIN_PASSWORD_HASH", PasswordHash.recommended().hash("admin123")
+)
 
 from database import Base, get_db
 from main import app

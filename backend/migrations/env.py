@@ -29,8 +29,8 @@ config = context.config
 # Configure database URL from environment variables
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql+asyncpg://postgres:postgres@localhost:5432/blog_ai"
-).replace("+asyncpg", "").replace("postgresql://", "postgresql+psycopg://")  # Use psycopg driver for sync migration
+    "mysql+aiomysql://blog:blog@localhost:3306/blog"
+).replace("+aiomysql", "").replace("mysql://", "mysql+pymysql://")  # Use pymysql driver for sync migration
 
 config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
