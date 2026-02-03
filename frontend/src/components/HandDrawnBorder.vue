@@ -9,7 +9,7 @@
 
 <template>
   <!-- 容器：包含插槽内容和手绘边框 -->
-  <div ref="containerRef" class="hand-drawn-border">
+  <div ref="containerRef" class="hand-drawn-border" :class="$attrs.class">
     <!-- 插槽：放置需要添加边框的内容 -->
     <slot />
   </div>

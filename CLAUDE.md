@@ -6,10 +6,47 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 
 Monorepo with separate frontend and backend:
 
-- `frontend/` - Vue 3 + TypeScript application
-- `backend/` - Python FastAPI application
+```
+blog-ai/
+├── frontend/                 # Vue 3 + TypeScript + Vite
+│   ├── src/
+│   │   ├── api/             # API interfaces
+│   │   ├── components/       # Vue components (HandDrawn* = Rough.js)
+│   │   ├── composables/      # Composables
+│   │   ├── router/           # Vue Router config
+│   │   ├── stores/           # Pinia stores
+│   │   ├── types/            # TypeScript types
+│   │   ├── utils/            # Utilities (markdown, date)
+│   │   └── views/            # Page views
+│   └── ...
+│
+├── backend/                  # FastAPI + Python
+│   ├── main.py              # App entry point
+│   ├── models.py            # SQLAlchemy ORM models
+│   ├── schemas.py           # Pydantic schemas
+│   ├── crud.py              # Async database operations
+│   ├── database.py          # DB connection (async aiomysql)
+│   ├── auth.py              # Admin authentication
+│   └── migrations/          # Alembic migrations
+│
+├── docker-compose.yml       # Docker deployment
+└── CLAUDE.md
+```
 
 ## Common Commands
+
+### Docker (Recommended for Production)
+
+```bash
+# Build and start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Rebuild images (after code changes)
+docker-compose up -d --build
+```
 
 ### Frontend (Vue 3 + Vite)
 
@@ -30,6 +67,9 @@ npm run type-check
 
 # Lint code
 npm run lint
+
+# Format code
+npm run format
 
 # Run tests
 npm run test
@@ -52,6 +92,8 @@ uv run pytest
 uv run pytest tests/test_posts.py -v  # Run specific test file
 ```
 
+**Database**: MySQL 8.4 (not PostgreSQL - migrated)
+
 ### Database Migrations (Alembic)
 
 ```bash
@@ -67,39 +109,20 @@ uv run alembic upgrade head
 uv run alembic downgrade -1
 ```
 
-### Docker
-
-```bash
-# Build and start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Rebuild images
-docker-compose up -d --build
-```
-
-## Architecture
+## Technology Stack
 
 ### Frontend
-- **Framework**: Vue 3 with Composition API (`<script setup>`)
-- **State Management**: Pinia (stores in `src/stores/`)
-- **UI Library**: Naive UI + Rough.js for hand-drawn style components
-- **Routing**: Vue Router with lazy-loaded routes and admin route guards
-- **Path Alias**: `@` maps to `frontend/src/`
+- Vue 3 + TypeScript + Vite
+- Naive UI + Rough.js (手绘风格)
+- Pinia + Vue Router + Axios
+- DOMPurify (XSS 防护) + VueUse
+- Vitest (测试)
 
 ### Backend
-- **Framework**: FastAPI with async SQLAlchemy 2.0
-- **Database**: MySQL 8.4 with aiomysql (async) and pymysql (sync migrations)
-- **ORM**: SQLAlchemy 2.0 with `Mapped[T]` annotations
-- **Validation**: Pydantic v2 with `model_config` and `model_validate()`
-
-### Data Flow
-
-```
-Views -> Pinia Store (blog.ts) -> blogApi (api/index.ts) -> FastAPI Backend
-```
+- FastAPI + SQLAlchemy 2.0 (异步)
+- MySQL 8.4 + aiomysql (async)
+- Alembic (数据库迁移)
+- Pytest (测试)
 
 ## Security
 

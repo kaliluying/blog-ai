@@ -45,7 +45,8 @@
 
           <!-- 文章列表 -->
           <div v-else class="posts-grid">
-            <HandDrawnCard v-for="post in posts" :key="post.id" :title="post.title" class="post-card">
+            <div v-for="post in posts" :key="post.id" class="post-card-wrapper" @click="readMore(post.id)">
+              <HandDrawnCard :title="post.title" class="post-card" hover-effect>
               <!-- 文章元信息：标签和日期 -->
               <div class="post-meta">
                 <n-tag v-for="tag in (post.tags || [])" :key="tag" size="small" round>
@@ -57,10 +58,11 @@
               <!-- 文章摘要 -->
               <p class="post-excerpt">{{ post.excerpt }}</p>
               <!-- 阅读更多按钮 -->
-              <n-button quaternary @click="readMore(post.id)">
+              <n-button quaternary @click.stop="readMore(post.id)">
                 阅读更多 →
               </n-button>
             </HandDrawnCard>
+            </div>
           </div>
 
           <!-- 空状态：无文章时显示 -->
@@ -320,6 +322,10 @@ const goToTag = (tag: string) => {
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+
+.post-card-wrapper {
+  cursor: pointer;
 }
 
 .post-card {

@@ -402,6 +402,11 @@ onUnmounted(() => {
   width: 100%;
 }
 
+:deep(.article-card:hover) {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
 /* 响应式：小屏幕隐藏侧边栏 */
 @media (max-width: 1024px) {
   .article-layout {
@@ -568,5 +573,57 @@ onUnmounted(() => {
 .loading-content p {
   margin-top: 16px;
   color: #7f8c8d;
+}
+
+/* ========== 移动端响应式样式 ========== */
+@media (max-width: 768px) {
+  .article-page {
+    padding: 20px 16px;
+  }
+
+  .article-title {
+    font-size: 1.8rem;
+    padding: 0 40px;
+  }
+
+  .article-content {
+    padding: 16px 0;
+    font-size: 1rem;
+  }
+
+  .back-btn {
+    position: static;
+    margin-bottom: 12px;
+  }
+
+  .article-header {
+    padding-top: 8px;
+  }
+
+  .article-meta {
+    gap: 8px;
+    font-size: 0.85rem;
+  }
+
+  .article-content :deep(pre) {
+    padding: 12px;
+  }
+
+  .article-content :deep(img) {
+    border-radius: 6px;
+  }
+}
+
+/* ========== 超小屏幕 ========== */
+@media (max-width: 480px) {
+  .article-title {
+    font-size: 1.5rem;
+    padding: 0 30px;
+  }
+
+  .article-content {
+    font-size: 0.95rem;
+    line-height: 1.7;
+  }
 }
 </style>

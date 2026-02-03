@@ -13,7 +13,7 @@
     :roughness="2"
     stroke="#34495e"
     class="hand-drawn-card"
-    :class="{ 'no-hover': !hoverEffect }"
+    :class="{ 'no-hover': hoverEffect === false }"
   >
     <!-- 卡片内容区域 -->
     <div class="card-content">
@@ -53,11 +53,12 @@ defineProps<{
 <style scoped>
 .hand-drawn-card {
   margin: 0;
-  transition: transform 0.2s ease;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
 }
 
 .hand-drawn-card:hover {
-  transform: rotate(-0.5deg) scale(1.01);
+  transform: rotate(-1deg) scale(1.02);
 }
 
 .hand-drawn-card.no-hover:hover {

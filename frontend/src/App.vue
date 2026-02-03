@@ -376,4 +376,52 @@ html.dark .article-content :deep(pre .copy-btn:hover) {
   opacity: 0;
   transform: translateY(20px);
 }
+
+/* ========== 移动端响应式样式 ========== */
+@media (max-width: 768px) {
+  .header-content {
+    padding: 12px 16px;
+    gap: 12px;
+  }
+
+  .logo span {
+    display: none;
+  }
+
+  .logo {
+    font-size: 1.2rem;
+  }
+
+  .search-box {
+    display: none;
+  }
+
+  .nav {
+    gap: 16px;
+  }
+
+  .nav-link {
+    font-size: 0.95rem;
+  }
+
+  .footer {
+    padding: 16px;
+  }
+
+  .footer p {
+    font-size: 0.9rem;
+  }
+
+  .back-to-top {
+    bottom: 24px;
+    right: 24px;
+  }
+}
+
+/* ========== 超小屏幕 ========== */
+@media (max-width: 480px) {
+  .nav-link {
+    font-size: 0.85rem;
+  }
+}
 </style>
