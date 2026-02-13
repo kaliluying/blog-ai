@@ -61,6 +61,10 @@
 </template>
 
 <script setup lang="ts">
+defineOptions({
+  name: 'AboutPage'
+})
+
 // 导入自定义手绘风格组件
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
 import HandDrawnIcon from '@/components/HandDrawnIcon.vue'

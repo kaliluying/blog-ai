@@ -17,7 +17,8 @@ from alembic import context
 
 # Load environment variables from .env
 from dotenv import load_dotenv
-load_dotenv()
+
+_ = load_dotenv()
 
 # Import Base from database module for autogenerate
 from database import Base
@@ -27,10 +28,11 @@ from database import Base
 config = context.config
 
 # Configure database URL from environment variables
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "mysql+aiomysql://blog:blog@localhost:3306/blog"
-).replace("+aiomysql", "").replace("mysql://", "mysql+pymysql://")  # Use pymysql driver for sync migration
+DATABASE_URL = (
+    os.getenv("DATABASE_URL", "postgresql+asyncpg://blog:blog@localhost:5432/blog")
+    .replace("+asyncpg", "+psycopg")
+    .replace("postgresql://", "postgresql+psycopg://")
+)
 
 config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
@@ -75,9 +77,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()

@@ -3,7 +3,7 @@
  *
  * 测试博客文章状态管理逻辑
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import Home from '@/views/Home.vue'
 
@@ -37,9 +37,14 @@ const mockPosts = [
 vi.mock('@/stores/blog', () => ({
   useBlogStore: () => ({
     posts: mockPosts,
+    popularPosts: [],
     loading: false,
     error: null,
+    totalCount: mockPosts.length,
+    currentPage: 1,
+    pageSize: 10,
     fetchPosts: vi.fn(),
+    fetchPopularPosts: vi.fn(),
   }),
 }))
 

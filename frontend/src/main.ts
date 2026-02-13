@@ -14,7 +14,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 
 // 从 naive-ui 包中导入 Naive UI 组件库和暗色主题
-import NaiveUI, { darkTheme } from 'naive-ui'
+import NaiveUI from 'naive-ui'
 
 // 导入根组件 App.vue
 import App from './App.vue'

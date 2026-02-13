@@ -102,31 +102,6 @@ uv run alembic revision --autogenerate -m "描述变更"
 uv run alembic upgrade head
 ```
 
-## Docker 部署
-
-```bash
-# 1. 创建环境变量文件
-cat > .env << EOF
-# 生成哈希密码
-ADMIN_PASSWORD_HASH=$(python -c "from pwdlib import PasswordHash; print(PasswordHash.recommended().hash('your_password'))")
-# 生成 JWT Secret
-JWT_SECRET=$(openssl rand -hex 32)
-# 生成数据库密码
-DB_PASSWORD=$(openssl rand -base64 24)
-EOF
-
-# 2. 构建并启动所有服务
-docker-compose up -d
-
-# 3. 查看日志
-docker-compose logs -f
-
-# 重新构建镜像
-docker-compose up -d --build
-```
-
-**端口**：前端 80，后端 8000，数据库 5432
-
 ## 环境变量
 
 ### 后端 (backend/.env)
@@ -188,7 +163,6 @@ blog-ai/
 │   ├── migrations/          # Alembic 迁移脚本
 │   └── ...
 │
-├── docker-compose.yml       # Docker Compose 配置
 └── README.md
 ```
 

@@ -67,6 +67,24 @@ export const useBlogStore = defineStore('blog', () => {
    */
   const pageSize = ref(10)
 
+  const normalizePosts = (value: unknown): BlogPost[] => {
+    if (Array.isArray(value)) {
+      return value as BlogPost[]
+    }
+
+    if (value && typeof value === 'object') {
+      const candidate = (value as { items?: unknown; posts?: unknown })
+      if (Array.isArray(candidate.items)) {
+        return candidate.items as BlogPost[]
+      }
+      if (Array.isArray(candidate.posts)) {
+        return candidate.posts as BlogPost[]
+      }
+    }
+
+    return []
+  }
+
   // ========== 辅助函数 ==========
 
   /**
@@ -115,7 +133,7 @@ export const useBlogStore = defineStore('blog', () => {
         blogApi.getPosts(skip, size),
         blogApi.getPostCount(),
       ])
-      posts.value = postsData || []
+      posts.value = normalizePosts(postsData)
       totalCount.value = typeof countData === 'number' ? countData : 0
     } catch (e) {
       setError('获取文章列表失败', e instanceof Error ? e : new Error(String(e)))
@@ -132,7 +150,7 @@ export const useBlogStore = defineStore('blog', () => {
     resetError()
 
     try {
-      posts.value = await blogApi.getPosts(0, 1000, includeScheduled)
+      posts.value = normalizePosts(await blogApi.getPosts(0, 1000, includeScheduled))
     } catch (e) {
       setError('获取文章列表失败', e instanceof Error ? e : new Error(String(e)))
     } finally {
@@ -198,7 +216,7 @@ export const useBlogStore = defineStore('blog', () => {
    */
   const fetchPopularPosts = async (limit: number = 5) => {
     try {
-      popularPosts.value = await viewApi.getPopularPosts(limit)
+      popularPosts.value = normalizePosts(await viewApi.getPopularPosts(limit))
     } catch (e) {
       console.error('获取热门文章失败', e)
     }

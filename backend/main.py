@@ -283,6 +283,13 @@ async def get_current_admin(request: Request) -> bool:
     return True
 
 
+async def verify_include_scheduled_access(
+    request: Request, include_scheduled: bool
+) -> None:
+    if include_scheduled:
+        await get_current_admin(request)
+
+
 # ========== FastAPI 应用初始化 ==========
 
 # 创建 FastAPI 应用实例
@@ -386,7 +393,7 @@ def parse_post_tags(post: BlogPost) -> List[str]:
     return tags if isinstance(tags, list) else []
 
 
-def post_to_dict(post: BlogPost) -> dict:
+def post_to_dict(post: BlogPost) -> dict[str, Any]:
     """将 BlogPost ORM 模型转换为完整字典"""
     now = utc_now()
     post_date = post.date
@@ -419,7 +426,7 @@ def post_to_list_item(post: BlogPost) -> BlogPostListItem:
     )
 
 
-def comment_to_dict(comment: Comment, nickname: str | None = None) -> dict:
+def comment_to_dict(comment: Comment, nickname: str | None = None) -> dict[str, Any]:
     """将 Comment ORM 模型转换为字典（匿名评论使用 nickname）"""
     return {
         "id": comment.id,
@@ -475,6 +482,7 @@ def group_posts_by_month(posts: List[BlogPost], year: int) -> List[ArchiveGroup]
 
 @app.get("/api/search", response_model=List[SearchResult])
 async def search_articles(
+    request: Request,
     q: str,
     skip: int = 0,
     limit: int = 50,
@@ -493,6 +501,8 @@ async def search_articles(
     Returns:
         List[SearchResult]: 搜索结果列表
     """
+    await verify_include_scheduled_access(request, include_scheduled)
+
     posts = await search_posts(
         db, query=q, skip=skip, limit=limit, include_scheduled=include_scheduled
     )
@@ -524,7 +534,9 @@ async def get_comments(
         List[dict]: 评论列表（包含嵌套回复）
     """
 
-    async def get_replies_recursive(parent_id: int, depth: int = 0) -> list:
+    async def get_replies_recursive(
+        parent_id: int, depth: int = 0
+    ) -> list[dict[str, Any]]:
         """递归获取所有层级的回复（带深度限制）"""
         if depth >= MAX_REPLY_DEPTH:
             return []
@@ -664,6 +676,7 @@ async def get_posts_count(db: AsyncSession = Depends(get_db)):
 
 @app.get("/api/posts")
 async def list_posts(
+    request: Request,
     skip: int = 0,
     limit: int = 100,
     include_scheduled: bool = False,
@@ -680,6 +693,8 @@ async def list_posts(
     Returns:
         List[dict]: 文章列表，每篇文章包含基本信息
     """
+    await verify_include_scheduled_access(request, include_scheduled)
+
     posts = await get_posts(
         db, skip=skip, limit=limit, include_scheduled=include_scheduled
     )
@@ -689,7 +704,10 @@ async def list_posts(
 
 @app.get("/api/posts/popular")
 async def get_popular_posts_route(
-    limit: int = 5, include_scheduled: bool = False, db: AsyncSession = Depends(get_db)
+    request: Request,
+    limit: int = 5,
+    include_scheduled: bool = False,
+    db: AsyncSession = Depends(get_db),
 ):
     """
     获取热门文章排行
@@ -701,6 +719,8 @@ async def get_popular_posts_route(
     Returns:
         List[dict]: 热门文章列表
     """
+    await verify_include_scheduled_access(request, include_scheduled)
+
     posts = await get_popular_posts(
         db, limit=limit, include_scheduled=include_scheduled
     )
@@ -729,6 +749,7 @@ async def get_post(post_id: int, db: AsyncSession = Depends(get_db)):
 
 @app.get("/api/posts/{post_id}/related")
 async def get_related_posts_route(
+    request: Request,
     post_id: int,
     limit: int = 5,
     include_scheduled: bool = False,
@@ -746,6 +767,8 @@ async def get_related_posts_route(
         tags = parse_post_tags(post)
         if not tags:
             return []
+
+        await verify_include_scheduled_access(request, include_scheduled)
 
         related = await get_related_posts(db, post_id, tags, limit, include_scheduled)
 
@@ -945,7 +968,9 @@ async def delete_existing_post(
 
 @app.get("/api/archive", response_model=List[ArchiveYear])
 async def get_archive_list(
-    include_scheduled: bool = False, db: AsyncSession = Depends(get_db)
+    request: Request,
+    include_scheduled: bool = False,
+    db: AsyncSession = Depends(get_db),
 ):
     """
     获取文章归档列表
@@ -958,6 +983,8 @@ async def get_archive_list(
     Returns:
         List[ArchiveYear]: 年度归档列表
     """
+    await verify_include_scheduled_access(request, include_scheduled)
+
     years = await get_archive_years(db)
     result = []
 
@@ -971,6 +998,7 @@ async def get_archive_list(
 
 @app.get("/api/archive/{year}", response_model=ArchiveYear)
 async def get_archive_by_year_route(
+    request: Request,
     year: int,
     include_scheduled: bool = False,
     db: AsyncSession = Depends(get_db),
@@ -987,6 +1015,8 @@ async def get_archive_by_year_route(
     Returns:
         ArchiveYear: 年度归档信息
     """
+    await verify_include_scheduled_access(request, include_scheduled)
+
     posts = await get_archive_by_year(db, year, include_scheduled)
 
     if not posts:
@@ -1000,6 +1030,7 @@ async def get_archive_by_year_route(
 
 @app.get("/api/archive/{year}/{month}", response_model=ArchiveGroup)
 async def get_archive_by_year_month_route(
+    request: Request,
     year: int,
     month: int,
     include_scheduled: bool = False,
@@ -1022,6 +1053,8 @@ async def get_archive_by_year_month_route(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="月份必须在 1-12 之间"
         )
+
+    await verify_include_scheduled_access(request, include_scheduled)
 
     posts = await get_archive_posts_by_year_month(db, year, month, include_scheduled)
 

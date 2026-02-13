@@ -19,10 +19,9 @@ SQLAlchemy ORM 数据模型定义模块
 
 # 标准库导入
 from datetime import datetime
-from typing import List
-
-# 第三方库导入
-from sqlalchemy import String, Text, DateTime, Boolean, Integer, JSON
+from typing import override
+from sqlalchemy import JSON, String, Text, DateTime, Integer
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 # 内部模块导入
@@ -53,12 +52,15 @@ class Comment(Base):
     nickname: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     parent_id: Mapped[int | None] = mapped_column(nullable=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=utc_now, onupdate=utc_now
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
 
-    def __repr__(self):
+    @override
+    def __repr__(self) -> str:
         return f"<Comment(id={self.id}, post_id={self.post_id}, nickname='{self.nickname}')>"
 
 
@@ -86,17 +88,23 @@ class BlogPost(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     excerpt: Mapped[str] = mapped_column(Text, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    tags: Mapped[List[str]] = mapped_column(JSON, default=list)
-    date: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    tags: Mapped[list[str]] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        default=list,
+    )
+    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     view_count: Mapped[int] = mapped_column(
         Integer, default=0, nullable=False, index=True
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=utc_now, onupdate=utc_now
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
 
-    def __repr__(self):
+    @override
+    def __repr__(self) -> str:
         """
         对象字符串表示
 
@@ -125,8 +133,9 @@ class SiteSettings(Base):
         DateTime(timezone=True), default=utc_now
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=utc_now, onupdate=utc_now
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
 
-    def __repr__(self):
+    @override
+    def __repr__(self) -> str:
         return f"<SiteSettings(key='{self.key}', value='{self.value}')>"

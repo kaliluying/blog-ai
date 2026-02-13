@@ -12,7 +12,7 @@
 
 <script setup lang="ts">
 // 从 vue 导入 Composition API 工具
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 
 // 导入 Rough.js 库
 import rough from 'roughjs'

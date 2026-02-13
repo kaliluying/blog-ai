@@ -14,16 +14,17 @@
 
 # 标准库导入
 import os
-from typing import List
+from typing import ClassVar
 
 # 第三方库导入
 from dotenv import load_dotenv
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker, DeclarativeBase
-from sqlalchemy.dialects import mysql
+from sqlalchemy import JSON
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase
 
 # 加载环境变量
-load_dotenv()
+_ = load_dotenv()
 
 # ========== 数据库配置 ==========
 
@@ -31,30 +32,31 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError(
-        "DATABASE_URL environment variable is required. "
-        "Example: mysql+aiomysql://user:password@localhost:3306/blog"
+        "DATABASE_URL environment variable is required. Example: postgresql+asyncpg://user:password@localhost:5432/blog"
     )
 
 # 创建异步数据库引擎
 # echo: 从环境变量读取，默认关闭 SQL 日志（生产环境）
 DB_ECHO = os.getenv("DB_ECHO", "false").lower() == "true"
-engine = create_async_engine(
-    DATABASE_URL,
-    echo=DB_ECHO,
-    pool_size=int(os.getenv("DB_POOL_SIZE", "5")),
-    max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "10")),
-)
+engine_options: dict[str, bool | int] = {
+    "echo": DB_ECHO,
+}
+if not DATABASE_URL.startswith("sqlite+aiosqlite"):
+    engine_options["pool_size"] = int(os.getenv("DB_POOL_SIZE", "5"))
+    engine_options["max_overflow"] = int(os.getenv("DB_MAX_OVERFLOW", "10"))
+    engine_options["pool_pre_ping"] = True
+    engine_options["pool_recycle"] = int(os.getenv("DB_POOL_RECYCLE", "1800"))
+
+engine = create_async_engine(DATABASE_URL, **engine_options)
 
 # 创建异步会话工厂
 # expire_on_commit=False: 提交后不立即过期对象，提高性能
-async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
-# DeclarativeBase: SQLAlchemy 2.0 推荐的 ORM 模型基类
-# 配置类型映射：Python list[str] 映射到 MySQL JSON 类型
 class Base(DeclarativeBase):
-    type_annotation_map = {
-        List[str]: mysql.JSON,
+    type_annotation_map: ClassVar[dict[object, object]] = {
+        list[str]: JSON().with_variant(JSONB, "postgresql"),
     }
 
 

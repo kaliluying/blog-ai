@@ -190,3 +190,15 @@ async def test_search_posts(client):
     data = response.json()
     assert len(data) >= 1
     assert "Python" in data[0]["title"]
+
+
+@pytest.mark.asyncio
+async def test_list_posts_include_scheduled_requires_admin(client):
+    response = await client.get("/api/posts?include_scheduled=true")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_search_include_scheduled_requires_admin(client):
+    response = await client.get("/api/search?q=test&include_scheduled=true")
+    assert response.status_code == 401

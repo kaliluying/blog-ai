@@ -6,6 +6,9 @@
 
 import asyncio
 import os
+import sys
+from pathlib import Path
+from typing import AsyncGenerator, Generator
 
 import pytest
 from httpx import AsyncClient, ASGITransport
@@ -18,6 +21,8 @@ os.environ.setdefault("JWT_SECRET", "test-secret")
 os.environ.setdefault(
     "ADMIN_PASSWORD_HASH", PasswordHash.recommended().hash("admin123")
 )
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from database import Base, get_db
 from main import app
@@ -42,7 +47,7 @@ TestingSessionLocal = async_sessionmaker(
 
 
 @pytest.fixture(scope="session")
-def event_loop():
+def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
     """创建事件循环实例"""
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
@@ -50,7 +55,7 @@ def event_loop():
 
 
 @pytest.fixture(autouse=True)
-async def setup_database():
+async def setup_database() -> AsyncGenerator[None, None]:
     """在每个测试前创建表，测试后删除表"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -60,14 +65,14 @@ async def setup_database():
 
 
 @pytest.fixture
-async def db_session() -> AsyncSession:
+async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """提供测试数据库会话"""
     async with TestingSessionLocal() as session:
         yield session
 
 
 @pytest.fixture
-async def client(db_session: AsyncSession) -> AsyncClient:
+async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """提供测试客户端"""
 
     async def override_get_db():

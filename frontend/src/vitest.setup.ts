@@ -5,7 +5,9 @@
  */
 
 // 导入 vi 用于设置测试环境
-import { vi } from 'vitest'
+import { beforeEach, vi } from 'vitest'
+import { config } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 
 // 设置全局 Date.now() 为固定值，确保时间相关测试的一致性
 const now = new Date('2026-01-15T12:00:00.000Z')
@@ -32,3 +34,14 @@ global.ResizeObserver = vi.fn().mockImplementation(() => ({
   unobserve: vi.fn(),
   disconnect: vi.fn(),
 }))
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+})
+
+config.global.stubs = {
+  'n-spin': true,
+  'n-tag': true,
+  'n-button': true,
+  'n-pagination': true,
+}

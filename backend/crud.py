@@ -16,11 +16,12 @@
 
 # 标准库导入
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import cast as typing_cast
 
 # 第三方库导入
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, text, func, distinct
+from sqlalchemy import select, or_, text, func, cast
+from sqlalchemy.dialects.postgresql import JSONB
 
 # 内部模块导入
 from models import BlogPost, Comment, SiteSettings
@@ -33,7 +34,7 @@ from utils.time import utc_now
 
 async def get_posts(
     db: AsyncSession, skip: int = 0, limit: int = 100, include_scheduled: bool = False
-) -> List[BlogPost]:
+) -> list[BlogPost]:
     """
     获取文章列表
 
@@ -67,7 +68,7 @@ async def get_posts(
     return list(result.scalars().all())
 
 
-async def get_post_by_id(db: AsyncSession, post_id: int) -> Optional[BlogPost]:
+async def get_post_by_id(db: AsyncSession, post_id: int) -> BlogPost | None:
     """
     根据 ID 获取单篇文章
 
@@ -84,7 +85,7 @@ async def get_post_by_id(db: AsyncSession, post_id: int) -> Optional[BlogPost]:
 
 
 async def check_post_title_exists(
-    db: AsyncSession, title: str, exclude_id: Optional[int] = None
+    db: AsyncSession, title: str, exclude_id: int | None = None
 ) -> bool:
     """
     检查文章标题是否已存在
@@ -108,7 +109,7 @@ async def check_post_title_exists(
 
 
 async def create_post(
-    db: AsyncSession, post: BlogPostCreate, tags: List[str] | None = None
+    db: AsyncSession, post: BlogPostCreate, tags: list[str] | None = None
 ) -> BlogPost:
     """
     创建新文章
@@ -147,8 +148,8 @@ async def update_post(
     db: AsyncSession,
     post_id: int,
     post_update: BlogPostUpdate,
-    tags: List[str] | None = None,
-) -> Optional[BlogPost]:
+    tags: list[str] | None = None,
+) -> BlogPost | None:
     """
     更新文章
 
@@ -171,7 +172,9 @@ async def update_post(
         return None
 
     # 获取更新数据的字典
-    update_data = post_update.model_dump(exclude_unset=True)
+    update_data = typing_cast(
+        dict[str, object], post_update.model_dump(exclude_unset=True)
+    )
 
     # 更新每个字段
     for field, value in update_data.items():
@@ -223,7 +226,7 @@ async def search_posts(
     skip: int = 0,
     limit: int = 100,
     include_scheduled: bool = False,
-) -> List[BlogPost]:
+) -> list[BlogPost]:
     """
     搜索文章
 
@@ -267,7 +270,7 @@ async def search_posts(
 
 async def get_comments_by_post(
     db: AsyncSession, post_id: int, sort: str = "newest"
-) -> List[Comment]:
+) -> list[Comment]:
     """获取文章的所有顶级评论
 
     Args:
@@ -288,7 +291,7 @@ async def get_comments_by_post(
     return list(result.scalars().all())
 
 
-async def get_comment_replies(db: AsyncSession, parent_id: int) -> List[Comment]:
+async def get_comment_replies(db: AsyncSession, parent_id: int) -> list[Comment]:
     """获取评论的所有回复"""
     result = await db.execute(
         select(Comment)
@@ -303,7 +306,7 @@ async def create_comment(
     post_id: int,
     nickname: str,
     content: str,
-    parent_id: Optional[int] = None,
+    parent_id: int | None = None,
 ) -> Comment:
     """创建匿名评论"""
     db_comment = Comment(
@@ -332,7 +335,7 @@ async def delete_comment(db: AsyncSession, comment_id: int) -> bool:
 
 async def get_archive_posts_by_year_month(
     db: AsyncSession, year: int, month: int, include_scheduled: bool = False
-) -> List[BlogPost]:
+) -> list[BlogPost]:
     """
     获取指定年月的文章列表
 
@@ -364,7 +367,7 @@ async def get_archive_posts_by_year_month(
     return list(result.scalars().all())
 
 
-async def get_archive_years(db: AsyncSession) -> List[int]:
+async def get_archive_years(db: AsyncSession) -> list[int]:
     """
     获取所有有文章的年份列表
 
@@ -386,7 +389,7 @@ async def get_archive_years(db: AsyncSession) -> List[int]:
 
 async def get_archive_by_year(
     db: AsyncSession, year: int, include_scheduled: bool = False
-) -> List[BlogPost]:
+) -> list[BlogPost]:
     """
     获取指定年份的所有文章
 
@@ -442,39 +445,14 @@ async def increment_post_view(db: AsyncSession, post_id: int) -> bool:
     """
     from sqlalchemy import update
 
-    # MySQL 不支持 RETURNING，使用 rowcount 判断
     stmt = (
         update(BlogPost)
         .where(BlogPost.id == post_id)
         .values(view_count=BlogPost.view_count + 1)
+        .returning(BlogPost.id)
     )
     result = await db.execute(stmt)
     await db.commit()
-    return result.rowcount > 0
-
-
-async def check_view_record_exists(db: AsyncSession, post_id: int, ip: str) -> bool:
-    """
-    检查该 IP 是否在 24 小时内已记录过浏览
-
-    Args:
-        db: 数据库会话
-        post_id: 文章 ID
-        ip: 客户端 IP
-
-    Returns:
-        bool: 是否已存在记录
-    """
-    # 查找 24 小时内该 IP 是否已有记录
-    result = await db.execute(
-        text("""
-            SELECT 1 FROM post_view_ips
-            WHERE post_id = :post_id AND ip = :ip
-            AND viewed_at > :expired_at
-            LIMIT 1
-        """),
-        {"post_id": post_id, "ip": ip, "expired_at": utc_now() - timedelta(hours=24)},
-    )
     return result.scalar_one_or_none() is not None
 
 
@@ -491,31 +469,32 @@ async def record_post_view(db: AsyncSession, post_id: int, ip: str) -> bool:
         bool: 是否成功计数（False 表示已在 24 小时内记录过）
     """
     now = utc_now()
+    expired_at = now - timedelta(hours=24)
 
-    # 检查是否已记录
-    if await check_view_record_exists(db, post_id, ip):
+    result = await db.execute(
+        text(
+            """
+            INSERT INTO post_view_ips (post_id, ip, viewed_at)
+            VALUES (:post_id, :ip, :viewed_at)
+            ON CONFLICT (post_id, ip)
+            DO UPDATE SET viewed_at = EXCLUDED.viewed_at
+            WHERE post_view_ips.viewed_at <= :expired_at
+            RETURNING id
+            """
+        ),
+        {"post_id": post_id, "ip": ip, "viewed_at": now, "expired_at": expired_at},
+    )
+    upserted_id = result.scalar_one_or_none()
+    if upserted_id is None:
         return False
 
-    # 记录新浏览（MySQL 使用 INSERT IGNORE）
-    result = await db.execute(
-        text("""
-            INSERT IGNORE INTO post_view_ips (post_id, ip, viewed_at)
-            VALUES (:post_id, :ip, :viewed_at)
-        """),
-        {"post_id": post_id, "ip": ip, "viewed_at": now},
-    )
-
-    # 只有插入新记录时才增加阅读量
-    row_count = getattr(result, "rowcount", 0) or 0
-    if row_count > 0:
-        await increment_post_view(db, post_id)
-
+    _ = await increment_post_view(db, post_id)
     return True
 
 
 async def get_popular_posts(
     db: AsyncSession, limit: int = 5, include_scheduled: bool = False
-) -> List[BlogPost]:
+) -> list[BlogPost]:
     """
     获取热门文章排行
 
@@ -542,10 +521,10 @@ async def get_popular_posts(
 async def get_related_posts(
     db: AsyncSession,
     post_id: int,
-    tags: List[str],
+    tags: list[str],
     limit: int = 5,
     include_scheduled: bool = False,
-) -> List[BlogPost]:
+) -> list[BlogPost]:
     """
     获取相关文章推荐
 
@@ -566,14 +545,7 @@ async def get_related_posts(
 
     now = utc_now()
 
-    # MySQL 使用 JSON_CONTAINS 检查 JSON 数组是否包含指定值
-    from sqlalchemy import or_
-
-    # 构建标签匹配条件：JSON_CONTAINS(tags, '"tagname"')
-    tag_conditions = [
-        text("JSON_CONTAINS(blog_posts.tags, :tag)").params(tag=f'"{tag}"')
-        for tag in tags[:5]
-    ]
+    tag_conditions = [cast(BlogPost.tags, JSONB).contains([tag]) for tag in tags[:5]]
 
     # 构建基础查询
     query = select(BlogPost).where(BlogPost.id != post_id, or_(*tag_conditions))
@@ -624,9 +596,9 @@ async def get_all_comments(
     db: AsyncSession,
     skip: int = 0,
     limit: int = 50,
-    post_id: Optional[int] = None,
-    keyword: Optional[str] = None,
-) -> List[Comment]:
+    post_id: int | None = None,
+    keyword: str | None = None,
+) -> list[Comment]:
     """
     获取所有评论（管理后台使用）
 
@@ -661,7 +633,7 @@ async def get_all_comments(
 
 
 async def get_comments_count(
-    db: AsyncSession, post_id: Optional[int] = None, keyword: Optional[str] = None
+    db: AsyncSession, post_id: int | None = None, keyword: str | None = None
 ) -> int:
     """
     获取评论总数（管理后台使用）
@@ -692,7 +664,7 @@ async def get_comments_count(
     return result.scalar() or 0
 
 
-async def get_dashboard_stats(db: AsyncSession) -> dict:
+async def get_dashboard_stats(db: AsyncSession) -> dict[str, int]:
     """
     获取仪表盘统计数据
 
@@ -729,7 +701,9 @@ async def get_dashboard_stats(db: AsyncSession) -> dict:
     }
 
 
-async def get_monthly_posts_stats(db: AsyncSession, months: int = 6) -> List[dict]:
+async def get_monthly_posts_stats(
+    db: AsyncSession, months: int = 6
+) -> list[dict[str, int | str]]:
     """
     获取最近月份的发布文章统计
 
@@ -741,7 +715,7 @@ async def get_monthly_posts_stats(db: AsyncSession, months: int = 6) -> List[dic
         List[dict]: 每月统计数据 [{month: '2024-01', count: 5}, ...]
     """
     now = utc_now()
-    result = []
+    result: list[dict[str, int | str]] = []
 
     for i in range(months):
         # 计算目标月份
@@ -773,7 +747,7 @@ async def get_monthly_posts_stats(db: AsyncSession, months: int = 6) -> List[dic
 # ========== 设置相关 CRUD ==========
 
 
-async def get_setting(db: AsyncSession, key: str) -> Optional[str]:
+async def get_setting(db: AsyncSession, key: str) -> str | None:
     """
     获取设置值
 
@@ -788,7 +762,7 @@ async def get_setting(db: AsyncSession, key: str) -> Optional[str]:
     return result.scalar_one_or_none()
 
 
-async def get_all_settings(db: AsyncSession) -> List[SiteSettings]:
+async def get_all_settings(db: AsyncSession) -> list[SiteSettings]:
     """
     获取所有设置
 

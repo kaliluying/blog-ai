@@ -184,7 +184,7 @@ import { formatTimeAgo } from '@/utils/date'
 import { renderMarkdownSafe } from '@/utils/markdown'
 
 // 导入昵称常量
-import { RANDOM_NICKNAMES, generateNickname } from '@/constants/nicknames'
+import { generateNickname } from '@/constants/nicknames'
 
 // ========== 组件接口定义 ==========
 

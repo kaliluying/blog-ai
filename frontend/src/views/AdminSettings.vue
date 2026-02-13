@@ -98,7 +98,6 @@ import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import HandDrawnCard from '@/components/HandDrawnCard.vue'
-import HandDrawnIcon from '@/components/HandDrawnIcon.vue'
 import { settingsApi } from '@/api'
 import { useAdminStore } from '@/stores/auth'
 

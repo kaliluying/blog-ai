@@ -129,8 +129,8 @@ const fetchComments = async () => {
       undefined,
       searchKeyword.value || undefined
     )
-    comments.value = response.comments
-    total.value = response.total
+    comments.value = Array.isArray(response.comments) ? response.comments : []
+    total.value = typeof response.total === 'number' ? response.total : comments.value.length
   } catch (error) {
     message.error('获取评论失败')
     console.error(error)

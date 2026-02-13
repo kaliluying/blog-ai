@@ -22,6 +22,7 @@ import type {
   ViewCountResponse,
   AdminLoginResponse,
   DashboardStats,
+  AdminComment,
   AdminCommentsResponse,
 } from '@/types'
 
@@ -314,9 +315,51 @@ export const adminApi = {
     postId?: number,
     keyword?: string
   ): Promise<AdminCommentsResponse> => {
-    return api.get('/api/admin/comments', {
+    const response = await api.get('/api/admin/comments', {
       params: { skip, limit, post_id: postId, keyword }
     })
+
+    if (Array.isArray(response)) {
+      return {
+        comments: response as AdminComment[],
+        total: response.length,
+        skip,
+        limit,
+      }
+    }
+
+    if (response && typeof response === 'object') {
+      const payload = response as {
+        comments?: unknown
+        items?: unknown
+        total?: unknown
+        count?: unknown
+        skip?: unknown
+        limit?: unknown
+      }
+      const comments = Array.isArray(payload.comments)
+        ? payload.comments
+        : Array.isArray(payload.items)
+          ? payload.items
+          : []
+      return {
+        comments: comments as AdminComment[],
+        total: typeof payload.total === 'number'
+          ? payload.total
+          : typeof payload.count === 'number'
+            ? payload.count
+            : comments.length,
+        skip: typeof payload.skip === 'number' ? payload.skip : skip,
+        limit: typeof payload.limit === 'number' ? payload.limit : limit,
+      }
+    }
+
+    return {
+      comments: [],
+      total: 0,
+      skip,
+      limit,
+    }
   },
 
   /**
