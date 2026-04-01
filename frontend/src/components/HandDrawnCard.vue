@@ -14,6 +14,10 @@
     stroke="#34495e"
     class="hand-drawn-card"
     :class="{ 'no-hover': hoverEffect === false }"
+    role="article"
+    :tabindex="hoverEffect !== false ? 0 : -1"
+    @keydown.enter="$emit('click')"
+    @keydown.space.prevent="$emit('click')"
   >
     <!-- 卡片内容区域 -->
     <div class="card-content">
@@ -47,6 +51,10 @@ import HandDrawnDivider from './HandDrawnDivider.vue'
 defineProps<{
   title?: string
   hoverEffect?: boolean
+}>()
+
+defineEmits<{
+  click: []
 }>()
 </script>
 

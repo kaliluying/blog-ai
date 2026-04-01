@@ -59,7 +59,7 @@
             <HandDrawnCard class="article-card" :hover-effect="false">
               <!-- 文章头部：标题和元信息 -->
               <div class="article-header">
-                <n-button quaternary @click="router.back()" class="back-btn">
+                <n-button quaternary @click="router.back()" class="back-btn" aria-label="返回上一页">
                   ← 返回
                 </n-button>
                 <h1 class="article-title">{{ post.title }}</h1>

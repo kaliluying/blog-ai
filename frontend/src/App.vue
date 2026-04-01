@@ -9,6 +9,9 @@
 -->
 
 <template>
+  <!-- Skip Link - 键盘导航跳转链接 -->
+  <a href="#main-content" class="skip-link">跳转到主要内容</a>
+
   <n-config-provider :theme-overrides="themeOverrides" :theme="naiveTheme">
 
     <n-message-provider>
@@ -55,7 +58,7 @@
               </header>
 
               <!-- 主内容区域 -->
-              <main class="main-content">
+              <main id="main-content" class="main-content">
                 <!-- 路由视图：使用 transition 实现页面切换过渡动画 -->
                 <router-view v-slot="{ Component }">
                   <transition name="fade">
@@ -356,6 +359,40 @@ html.dark .article-content :deep(pre .copy-btn) {
 html.dark .article-content :deep(pre .copy-btn:hover) {
   background: rgba(255, 255, 255, 0.2);
   color: #e4e4e7;
+}
+
+/* ========== Skip Link 样式 ========== */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--primary-color, #34495e);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  z-index: 10000;
+  text-decoration: none;
+  font-weight: 600;
+  transition: top 0.3s;
+}
+
+.skip-link:focus {
+  top: 10px;
+  outline: 3px solid var(--primary-color, #34495e);
+  outline-offset: 2px;
+}
+
+/* ========== 全局焦点样式 - 确保键盘导航可见 ========== */
+:focus-visible {
+  outline: 3px solid var(--primary-color, #34495e);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--primary-color, #34495e);
+  outline-offset: 2px;
 }
 
 .back-to-top {

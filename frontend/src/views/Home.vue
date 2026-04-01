@@ -55,7 +55,9 @@
           <!-- 文章列表 -->
           <div v-else class="posts-grid">
             <div v-for="post in posts" :key="post.id" class="post-card-wrapper" @click="readMore(post.id)">
-              <HandDrawnCard :title="post.title" class="post-card" hover-effect>
+              <HandDrawnCard :title="post.title" class="post-card" hover-effect
+                :aria-label="`阅读文章: ${post.title}`"
+              >
               <!-- 文章元信息：标签和日期 -->
               <div class="post-meta">
                 <n-tag v-for="tag in (post.tags || [])" :key="tag" size="small" round>
