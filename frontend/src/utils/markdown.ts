@@ -149,7 +149,7 @@ export const renderMarkdownWithCodeSafe = (text: string): string => {
       'ul', 'ol', 'li', 'blockquote',
       'a'
     ],
-    ALLOWED_ATTR: ['href', 'target', 'class', 'rel', 'data-code']
+    ALLOWED_ATTR: ['href', 'target', 'class', 'rel', 'data-code', 'data-src']
   })
 }
 

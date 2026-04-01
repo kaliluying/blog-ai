@@ -22,11 +22,23 @@
     <div class="article-container">
 
       <!-- 1. 加载状态 -->
-      <div v-if="loading" class="loading-state">
+      <div v-if="loading" class="skeleton-container">
         <HandDrawnCard>
-          <div class="loading-content">
-            <n-spin size="large" />
-            <p>加载中...</p>
+          <div class="skeleton-content">
+            <n-skeleton :width="150" height="40" class="skeleton-title" />
+            <div class="skeleton-meta">
+              <n-skeleton :width="60" height="24" />
+              <n-skeleton :width="80" height="24" />
+              <n-skeleton :width="100" height="24" />
+            </div>
+            <div class="skeleton-body">
+              <n-skeleton :width="'100%'" height="20" />
+              <n-skeleton :width="'95%'" height="20" />
+              <n-skeleton :width="'90%'" height="20" />
+              <n-skeleton :width="'60%'" height="20" />
+              <n-skeleton :width="'100%'" height="20" />
+              <n-skeleton :width="'85%'" height="20" />
+            </div>
           </div>
         </HandDrawnCard>
       </div>
@@ -104,6 +116,9 @@
 <script setup lang="ts">
 // 从 vue 导入 Composition API 工具
 import { ref, computed, onMounted, watch, onUnmounted, nextTick } from 'vue'
+
+// 从 VueUse 导入 Intersection Observer
+import { useIntersectionObserver } from '@vueuse/core'
 
 // 从 vue-router 导入路由功能
 import { useRoute, useRouter } from 'vue-router'
@@ -189,6 +204,9 @@ const activeHeadingId = ref<string>('')
 // 滚动观察器
 let scrollObserver: IntersectionObserver | null = null
 
+// 懒加载观察者清理
+const lazyImageStops: (() => void)[] = []
+
 // ========== TOC 方法 ==========
 
 /**
@@ -261,6 +279,43 @@ const cleanupScrollObserver = () => {
   }
 }
 
+// ========== 懒加载方法 ==========
+
+/**
+ * 设置图片懒加载
+ * 使用 IntersectionObserver 监听图片进入视口
+ */
+const setupLazyImages = () => {
+  if (!contentRef.value) return
+
+  const images = contentRef.value.querySelectorAll('img')
+  images.forEach((img) => {
+    const { stop } = useIntersectionObserver(
+      img,
+      ([{ isIntersecting }]) => {
+        if (isIntersecting) {
+          const dataSrc = img.getAttribute('data-src')
+          if (dataSrc) {
+            img.src = dataSrc
+            img.removeAttribute('data-src')
+          }
+          stop()
+        }
+      },
+      { threshold: 0.1 }
+    )
+    lazyImageStops.push(stop)
+  })
+}
+
+/**
+ * 清理懒加载观察者
+ */
+const cleanupLazyImages = () => {
+  lazyImageStops.forEach(stop => stop())
+  lazyImageStops.length = 0
+}
+
 // ========== 方法 ==========
 
 /**
@@ -306,6 +361,7 @@ const fetchPost = async () => {
         setupCopyButtons(contentRef.value)
         extractHeadings()
         setupScrollObserver()
+        setupLazyImages()
       }
     })
 
@@ -330,7 +386,11 @@ const fetchPost = async () => {
  * 使用共享的 Markdown 渲染函数并消毒 HTML
  * 当 post 变化时自动重新渲染
  */
-const safeContent = computed(() => renderMarkdownWithCodeSafe(post.value?.content || ''))
+const safeContent = computed(() => {
+  const html = renderMarkdownWithCodeSafe(post.value?.content || '')
+  // 将外部图片的 src 转为 data-src（保留 base64 图片的 src）
+  return html.replace(/<img([^>]+)src="(https?:\/\/[^"]+)"/g, '<img$1data-src="$2"')
+})
 
 // ========== 生命周期 ==========
 
@@ -341,6 +401,7 @@ onMounted(async () => {
 
 // 监听路由参数变化（文章 ID 变化时重新获取）
 watch(() => route.params.id, async () => {
+  cleanupLazyImages()  // 清理之前的懒加载观察者
   post.value = null  // 先清空文章，确保触发更新
   await fetchPost()  // fetchPost 内部会调用 recordView
 })
@@ -351,6 +412,7 @@ onUnmounted(() => {
     cleanupCopyButtons(contentRef.value)
   }
   cleanupScrollObserver()
+  cleanupLazyImages()
 })
 </script>
 
@@ -521,6 +583,12 @@ onUnmounted(() => {
 .article-content :deep(img) {
   max-width: 100%;
   border-radius: 8px;
+  opacity: 0;
+  transition: opacity 0.3s ease-in;
+}
+
+.article-content :deep(img[src]) {
+  opacity: 1;
 }
 
 .article-content :deep(pre) {
@@ -559,20 +627,30 @@ onUnmounted(() => {
   justify-content: center;
 }
 
-.loading-state,
-.error-state {
+.skeleton-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.skeleton-content {
+  padding: 20px 0;
+}
+
+.skeleton-title {
+  margin: 0 auto 20px;
+}
+
+.skeleton-meta {
   display: flex;
   justify-content: center;
+  gap: 16px;
+  margin-bottom: 32px;
 }
 
-.loading-content {
-  text-align: center;
-  padding: 40px;
-}
-
-.loading-content p {
-  margin-top: 16px;
-  color: #7f8c8d;
+.skeleton-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 /* ========== 移动端响应式样式 ========== */

@@ -38,9 +38,18 @@
           </h2>
 
           <!-- 加载状态 -->
-          <div v-if="loading" class="loading-state">
-            <n-spin size="large" />
-            <p>加载中...</p>
+          <div v-if="loading" class="skeleton-container">
+            <HandDrawnCard v-for="i in pageSize" :key="i" class="skeleton-card">
+              <n-skeleton :height="200" :width="'100%'" class="skeleton-img" />
+              <div class="skeleton-meta">
+                <n-skeleton :width="'60'" height="20" />
+                <n-skeleton :width="'80'" height="20" />
+                <n-skeleton :width="'100'" height="20" />
+              </div>
+              <n-skeleton :width="'60%'" height="20" />
+              <n-skeleton :width="'80%'" height="16" />
+              <n-skeleton :width="'40%'" height="16" />
+            </HandDrawnCard>
           </div>
 
           <!-- 文章列表 -->
@@ -373,6 +382,29 @@ const goToTag = (tag: string) => {
 .loading-state p,
 .empty-state p {
   margin-top: 16px;
+}
+
+.skeleton-container {
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.skeleton-card {
+  width: 100%;
+}
+
+.skeleton-meta {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+/* skeleton-img 是 n-skeleton 的直接子元素，需要在 skeleton-container 下定义 */
+.skeleton-container .skeleton-img {
+  margin-bottom: 16px;
+  border-radius: 8px;
 }
 
 .pagination-wrapper {
