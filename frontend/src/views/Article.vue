@@ -292,8 +292,8 @@ const setupLazyImages = () => {
   images.forEach((img) => {
     const { stop } = useIntersectionObserver(
       img,
-      ([{ isIntersecting }]) => {
-        if (isIntersecting) {
+      ([entry]) => {
+        if (entry?.isIntersecting) {
           const dataSrc = img.getAttribute('data-src')
           if (dataSrc) {
             img.src = dataSrc
@@ -331,6 +331,76 @@ const fetchComments = async () => {
 }
 
 /**
+ * 更新文章页面 SEO Meta 标签和 JSON-LD
+ */
+const updateSEO = () => {
+  if (!post.value) return
+
+  const title = `${post.value.title} - 手绘博客`
+  const description = post.value.excerpt || ''
+  const url = `https://blog.gmlblog.top/article/${post.value.id}`
+
+  // 更新 title
+  document.title = title
+
+  // 更新 Meta 标签
+  const metaMap: Record<string, string> = {
+    'description': description,
+    'og:title': title,
+    'og:description': description,
+    'og:url': url,
+    'og:type': 'article',
+    'twitter:title': title,
+    'twitter:description': description,
+  }
+
+  Object.entries(metaMap).forEach(([name, content]) => {
+    let meta = document.querySelector(`meta[name="${name}"], meta[property="${name}"]`)
+    if (!meta) {
+      meta = document.createElement('meta')
+      if (name.startsWith('og:') || name.startsWith('twitter:')) {
+        meta.setAttribute('property', name)
+      } else {
+        meta.setAttribute('name', name)
+      }
+      document.head.appendChild(meta)
+    }
+    meta.setAttribute('content', content)
+  })
+
+  // 更新 canonical
+  let canonical = document.querySelector('link[rel="canonical"]')
+  if (canonical) {
+    canonical.setAttribute('href', url)
+  }
+
+  // 更新 JSON-LD
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    'headline': post.value.title,
+    'description': description,
+    'datePublished': post.value.date,
+    'dateModified': post.value.updated_at || post.value.date,
+    'author': {
+      '@type': 'Person',
+      'name': '博主大大'
+    },
+    'publisher': {
+      '@type': 'Organization',
+      'name': '手绘博客',
+      'url': 'https://blog.gmlblog.top/'
+    },
+    'url': url
+  }
+
+  const scriptEl = document.getElementById('json-ld')
+  if (scriptEl) {
+    scriptEl.textContent = JSON.stringify(jsonLd)
+  }
+}
+
+/**
  * 处理评论排序变化
  */
 const handleCommentSortChange = (order: 'newest' | 'oldest') => {
@@ -352,6 +422,9 @@ const fetchPost = async () => {
 
     // 获取评论
     await fetchComments()
+
+    // 更新 SEO
+    updateSEO()
 
     // 等待 DOM 更新后设置代码块复制按钮和目录
     await nextTick()

@@ -195,7 +195,42 @@ const blogStore = useBlogStore()
  */
 onMounted(() => {
   blogStore.fetchPosts(1, POSTS_PER_PAGE)
+  updateSEO()
 })
+
+/**
+ * 更新首页 SEO Meta 标签
+ */
+const updateSEO = () => {
+  const title = '手绘博客 - 首页'
+  const description = '记录想法，分享技术，热爱生活'
+  const url = 'https://blog.gmlblog.top/'
+
+  document.title = title
+
+  const metaMap: Record<string, string> = {
+    'description': description,
+    'og:title': title,
+    'og:description': description,
+    'og:url': url,
+    'og:type': 'website',
+    'twitter:title': title,
+    'twitter:description': description,
+  }
+
+  Object.entries(metaMap).forEach(([name, content]) => {
+    let meta = document.querySelector(`meta[name="${name}"], meta[property="${name}"]`)
+    if (meta) {
+      meta.setAttribute('content', content)
+    }
+  })
+
+  // 清除 JSON-LD（首页不需要 Article 类型）
+  const scriptEl = document.getElementById('json-ld')
+  if (scriptEl) {
+    scriptEl.textContent = ''
+  }
+}
 
 /**
  * 页码改变

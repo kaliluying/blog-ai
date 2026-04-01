@@ -27,7 +27,7 @@ from typing import Any, List
 # 第三方库导入
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -1226,6 +1226,61 @@ async def update_setting(
     return SettingItem(
         key=setting.key, value=setting.value, description=setting.description
     )
+
+
+# ========== SEO 路由 ==========
+
+
+@app.get("/robots.txt", response_class=PlainTextResponse)
+async def get_robots_txt():
+    """获取 robots.txt"""
+    site_url = os.getenv("SITE_URL", "https://blog.gmlblog.top")
+    return f"""User-agent: *
+Allow: /
+Disallow: /admin/
+Sitemap: {site_url}/sitemap.xml
+
+Crawl-delay: 1
+"""
+
+
+@app.get("/sitemap.xml", response_class=PlainTextResponse)
+async def get_sitemap_xml(db: AsyncSession = Depends(get_db)):
+    """获取 sitemap.xml"""
+    from models import BlogPost
+    from sqlalchemy import select
+
+    query = select(BlogPost.id, BlogPost.date, BlogPost.updated_at)
+    result = await db.execute(query.order_by(BlogPost.date.desc()))
+    posts = result.all()
+
+    site_url = os.getenv("SITE_URL", "https://blog.gmlblog.top")
+
+    xml_content = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml_content += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+
+    # 添加首页
+    xml_content += f'  <url>\n    <loc>{site_url}/</loc>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>\n'
+
+    for post in posts:
+        url = f"{site_url}/article/{post.id}"
+        lastmod = None
+        if post.updated_at:
+            lastmod = post.updated_at.strftime("%Y-%m-%d")
+        elif post.date:
+            lastmod = post.date.strftime("%Y-%m-%d")
+
+        priority = "0.9" if post.updated_at else "0.7"
+
+        xml_content += f'  <url>\n    <loc>{url}</loc>\n'
+        if lastmod:
+            xml_content += f'    <lastmod>{lastmod}</lastmod>\n'
+        xml_content += '    <changefreq>monthly</changefreq>\n'
+        xml_content += f'    <priority>{priority}</priority>\n'
+        xml_content += '  </url>\n'
+
+    xml_content += '</urlset>'
+    return xml_content
 
 
 # ========== 应用启动入口 ==========
